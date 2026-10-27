@@ -94,15 +94,53 @@
     card.style.setProperty('--my', `${e.clientY - r.top}px`);
   }, {passive: true});
 
-  // Magnetic buttons.
-  document.addEventListener('pointermove', e => {
-    const el = e.target.closest?.('.magnetic');
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    el.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * .18}px, ${(e.clientY - r.top - r.height / 2) * .3}px)`;
-  }, {passive: true});
-  document.addEventListener('pointerout', e => {
-    const el = e.target.closest?.('.magnetic');
-    if (el && !el.contains(e.relatedTarget)) el.style.transform = '';
-  });
+  // Magnetic buttons. The pull is measured from where the button rests, not
+  // from where it was just moved to — measuring the moved box fed each shift
+  // back into the next and made the button shake — and it is eased once per
+  // frame rather than set on every pointer event.
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const pulls = new Map();
+    let frame = 0;
+    const step = () => {
+      frame = 0;
+      for (const [el, p] of pulls) {
+        p.x += (p.tx - p.x) * .2;
+        p.y += (p.ty - p.y) * .2;
+        const settled = Math.abs(p.tx - p.x) < .05 && Math.abs(p.ty - p.y) < .05;
+        if (settled && !p.tx && !p.ty) { el.style.transform = ''; pulls.delete(el); continue; }
+        el.style.transform = `translate3d(${p.x.toFixed(2)}px, ${p.y.toFixed(2)}px, 0)`;
+        if (!settled) frame ||= requestAnimationFrame(step);
+      }
+    };
+    const kick = () => { frame ||= requestAnimationFrame(step); };
+    document.addEventListener('pointermove', e => {
+      const el = e.target.closest?.('.magnetic');
+      if (!el) return;
+      let p = pulls.get(el);
+      if (!p) {
+        const r = el.getBoundingClientRect();
+        p = {x: 0, y: 0, tx: 0, ty: 0, cx: r.left + r.width / 2, cy: r.top + r.height / 2};
+        pulls.set(el, p);
+      }
+      if (!p.rest) {
+        // Re-read the resting centre once per hover, with the current pull taken out.
+        const r = el.getBoundingClientRect();
+        p.cx = r.left + r.width / 2 - p.x;
+        p.cy = r.top + r.height / 2 - p.y;
+        p.rest = true;
+      }
+      p.tx = (e.clientX - p.cx) * .12;
+      p.ty = (e.clientY - p.cy) * .18;
+      kick();
+    }, {passive: true});
+    document.addEventListener('pointerout', e => {
+      const el = e.target.closest?.('.magnetic');
+      const p = el && pulls.get(el);
+      if (!p || el.contains(e.relatedTarget)) return;
+      p.tx = 0; p.ty = 0; p.rest = false;
+      kick();
+    });
+    // A scroll moves the resting centre; measure it again on the next move.
+    addEventListener('scroll', () => { for (const p of pulls.values()) p.rest = false; }, {passive: true});
+  }
 })();
