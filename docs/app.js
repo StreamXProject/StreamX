@@ -34,10 +34,6 @@ async function loadReleases() {
       const download = apk && link(apk, '');
       if (download) for (const a of document.querySelectorAll('#download, [data-download-mirror]')) a.href = download.href;
       document.getElementById('release-notes').href = `${releaseRoot}/tag/${encodeURIComponent(stable.tag_name)}`;
-      document.getElementById('version').textContent = `${stable.tag_name} · Android 8.0+ · ARM64${apk ? ` · ${megabytes(apk.size)}` : ''}`;
-      document.getElementById('stable-title').textContent = `StreamX ${stable.tag_name.replace(/^v/, '')}`;
-      document.getElementById('stable-detail').textContent = `Released ${date(stable.published_at)} · SHA-256 checksums included`;
-      apkLinks(stable, 'stable-assets');
     }
     const modelResponse = await fetch(`https://api.github.com/repos/${modelRepository}/releases?per_page=100`);
     if (!modelResponse.ok) throw new Error(`Models HTTP ${modelResponse.status}`);
