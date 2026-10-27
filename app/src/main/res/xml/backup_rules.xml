@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Auto-backup rules for Android 11 and older; data_extraction_rules.xml
+   replaces these from Android 12.
+
+   The encrypted stores are excluded because their keysets are wrapped by an
+   Android Keystore key that never leaves the device: restored anywhere, they
+   can't be decrypted (see EncryptedPrefs). Their plain fallbacks are excluded
+   because they hold the same credentials in cleartext.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="cloudstream_credentials.xml" />
+        <exclude domain="sharedpref" path="streamx_extension_repository_access.xml" />
+    <exclude domain="sharedpref" path="streamx_auth.xml" />
+    <exclude domain="sharedpref" path="streamx_auth_plain.xml" />
+    <exclude domain="sharedpref" path="streamx_sources.xml" />
+    <exclude domain="sharedpref" path="streamx_sources_plain.xml" />
+    <!-- Playback queues are local session state; do not resurrect them after reinstall. -->
+    <exclude domain="sharedpref" path="streamx_last_played.xml" />
+    <exclude domain="sharedpref" path="streamx_bounded_context.xml" />
+    <exclude domain="sharedpref" path="streamx_party_queue_stash.xml" />
+</full-backup-content>

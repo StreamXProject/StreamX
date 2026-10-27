@@ -1,0 +1,14 @@
+# Copy relevant values into local.properties (gitignored), or export environment variables.
+# Environment variables override non-empty local values. No .env loader is used.
+# Telegram values are public App URL hostnames, not bot tokens or client secrets.
+# Use the App URL generated for the exact package AND SHA-256 signing certificate.
+TELEGRAM_LOGIN_HOST_PROD=app2560996458-login.tg.dev
+TELEGRAM_LOGIN_HOST_PROD_DEBUG=app3941916923-login.tg.dev
+# Register com.dev.streamx in BotFather, then fill this with its generated App URL host.
+TELEGRAM_LOGIN_HOST_DEV=
+# Optional overrides if debug/release/benchmark have different registrations:
+# TELEGRAM_LOGIN_HOST_DEV_DEBUG=appYOUR_DEBUG_REGISTRATION-login.tg.dev
+# TELEGRAM_LOGIN_HOST_DEV_RELEASE=appYOUR_RELEASE_REGISTRATION-login.tg.dev
+# TELEGRAM_LOGIN_HOST_PROD_BENCHMARK=appYOUR_BENCHMARK_REGISTRATION-login.tg.dev
+# Benchmark packages append .benchmark and require their own registration.
+# If no host is configured, native Telegram login is disabled for that variant.

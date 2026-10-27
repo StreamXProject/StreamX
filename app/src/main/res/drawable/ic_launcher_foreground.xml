@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <!-- Two arcs that make an S. Scaled into the adaptive icon's safe zone. -->
+    <group
+        android:pivotX="512"
+        android:pivotY="512"
+        android:scaleX="0.66"
+        android:scaleY="0.66">
+        <path
+            android:pathData="M660,410A148,148 0,1 0,512 558"
+            android:strokeColor="#FF1F1F1F"
+            android:strokeWidth="92"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M364,614A148,148 0,1 0,512 466"
+            android:strokeColor="#FFF28C00"
+            android:strokeWidth="92"
+            android:strokeLineCap="round" />
+    </group>
+</vector>

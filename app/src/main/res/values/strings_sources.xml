@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Playback order on the Sources tab. -->
+<resources>
+    <string name="playback_order_header">Playback order</string>
+    <string name="playback_order_footer">Audio is fetched from these in order. Touch and hold a source, then drag to rearrange. If a source does not have a track or cannot be reached, StreamX tries the next one. Sources above YouTube Music can replace its recording when they return a better version.</string>
+</resources>

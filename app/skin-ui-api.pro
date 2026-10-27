@@ -1,0 +1,189 @@
+# Executable skins link against these public SDK/framework APIs at runtime.
+# Keep names/signatures even when no built-in screen calls a particular overload.
+-keep class com.music.streamx.ui.skins.** { public protected *; }
+-keep class com.music.streamx.ui.player.** { public protected *; }
+-keep class com.music.streamx.ui.components.BottomTab { public *; }
+# The card-to-page zoom a skin's own cards join, see CardZoom.kt.
+-keep class com.music.streamx.ui.components.CardZoom { public *; }
+-keep class com.music.streamx.ui.components.CardZoomKt { public *; }
+# The hold that lifts a row into its menu, and the finger that then picks from it.
+-keep class com.music.streamx.ui.components.LongPressOriginKt { public *; }
+-keep class com.music.streamx.ui.components.LongPressOrigin { public *; }
+-keep class com.music.streamx.ui.components.HeldItem { public *; }
+-keep class com.music.streamx.ui.components.HeldPointer { public *; }
+# iOS 26's glass menu and where it grows from, for skins' own menus.
+-keep class com.music.streamx.ui.components.GlassMenuKt { public *; }
+-keep class com.music.streamx.ui.components.GlassMenuAction { public *; }
+-keep class com.music.streamx.ui.components.MenuAnchor { public *; }
+-keep class com.music.streamx.ui.haptics.** { public protected *; }
+-keep class com.music.streamx.ui.theme.** { public protected *; }
+-keep class com.music.streamx.ui.LyricsProviderState { public *; }
+-keep class com.music.streamx.playback.PlaybackPosition { public *; }
+-keep class com.music.streamx.data.model.** { public protected *; }
+-keep class com.music.streamx.data.lyrics.** { public protected *; }
+-keep class com.music.streamx.data.canvas.CanvasArtwork { public *; }
+-keep class androidx.compose.runtime.** { public protected *; }
+-keep class androidx.compose.ui.** { public protected *; }
+-keep class androidx.compose.foundation.** { public protected *; }
+-keep class androidx.compose.animation.** { public protected *; }
+-keep class androidx.compose.material3.** { public protected *; }
+-keep class androidx.lifecycle.compose.** { public protected *; }
+-keep class coil3.compose.** { public protected *; }
+-keep class coil3.ImageLoader { public protected *; }
+-keep class coil3.SingletonImageLoader { public protected *; }
+-keep class dev.chrisbanes.haze.** { public protected *; }
+-keep class kotlin.** { public protected *; }
+-keep class kotlinx.coroutines.** { public protected *; }
+
+# Semantic icon pack dependencies, rather than the entire extended icon catalogue.
+-keep class androidx.compose.material.icons.outlined.AccountCircleKt { public *; }
+-keep class androidx.compose.material.icons.outlined.AlbumKt { public *; }
+-keep class androidx.compose.material.icons.outlined.AnimationKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ArrowBackKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ArrowDownwardKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ArrowUpwardKt { public *; }
+-keep class androidx.compose.material.icons.outlined.AutoAwesomeKt { public *; }
+-keep class androidx.compose.material.icons.outlined.BarChartKt { public *; }
+-keep class androidx.compose.material.icons.outlined.BedtimeKt { public *; }
+-keep class androidx.compose.material.icons.outlined.BluetoothKt { public *; }
+-keep class androidx.compose.material.icons.outlined.BlurOffKt { public *; }
+-keep class androidx.compose.material.icons.outlined.BlurOnKt { public *; }
+-keep class androidx.compose.material.icons.outlined.Brightness4Kt { public *; }
+-keep class androidx.compose.material.icons.outlined.BugReportKt { public *; }
+-keep class androidx.compose.material.icons.outlined.CachedKt { public *; }
+-keep class androidx.compose.material.icons.outlined.CastKt { public *; }
+-keep class androidx.compose.material.icons.outlined.CastConnectedKt { public *; }
+-keep class androidx.compose.material.icons.outlined.CheckKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ChevronRightKt { public *; }
+-keep class androidx.compose.material.icons.outlined.CloseKt { public *; }
+-keep class androidx.compose.material.icons.outlined.CloudKt { public *; }
+-keep class androidx.compose.material.icons.outlined.CloudDoneKt { public *; }
+-keep class androidx.compose.material.icons.outlined.CloudOffKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ContentCopyKt { public *; }
+-keep class androidx.compose.material.icons.outlined.DeleteKt { public *; }
+-keep class androidx.compose.material.icons.outlined.DeleteForeverKt { public *; }
+-keep class androidx.compose.material.icons.outlined.DeleteSweepKt { public *; }
+-keep class androidx.compose.material.icons.outlined.DnsKt { public *; }
+-keep class androidx.compose.material.icons.outlined.DownloadDoneKt { public *; }
+-keep class androidx.compose.material.icons.outlined.DownloadingKt { public *; }
+-keep class androidx.compose.material.icons.outlined.DragHandleKt { public *; }
+-keep class androidx.compose.material.icons.outlined.EditKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ErrorOutlineKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ExtensionKt { public *; }
+-keep class androidx.compose.material.icons.outlined.FastForwardKt { public *; }
+-keep class androidx.compose.material.icons.outlined.FastRewindKt { public *; }
+-keep class androidx.compose.material.icons.outlined.FavoriteKt { public *; }
+-keep class androidx.compose.material.icons.outlined.FavoriteBorderKt { public *; }
+-keep class androidx.compose.material.icons.outlined.FileDownloadKt { public *; }
+-keep class androidx.compose.material.icons.outlined.FileUploadKt { public *; }
+-keep class androidx.compose.material.icons.outlined.FilterAltKt { public *; }
+-keep class androidx.compose.material.icons.outlined.FolderKt { public *; }
+-keep class androidx.compose.material.icons.outlined.FullscreenKt { public *; }
+-keep class androidx.compose.material.icons.outlined.GradientKt { public *; }
+-keep class androidx.compose.material.icons.outlined.GraphicEqKt { public *; }
+-keep class androidx.compose.material.icons.outlined.GroupKt { public *; }
+-keep class androidx.compose.material.icons.outlined.GroupsKt { public *; }
+-keep class androidx.compose.material.icons.outlined.HeadphonesKt { public *; }
+-keep class androidx.compose.material.icons.outlined.HighQualityKt { public *; }
+-keep class androidx.compose.material.icons.outlined.HistoryKt { public *; }
+-keep class androidx.compose.material.icons.outlined.InsertDriveFileKt { public *; }
+-keep class androidx.compose.material.icons.outlined.IosShareKt { public *; }
+-keep class androidx.compose.material.icons.outlined.KeyKt { public *; }
+-keep class androidx.compose.material.icons.outlined.KeyboardArrowRightKt { public *; }
+-keep class androidx.compose.material.icons.outlined.LabelKt { public *; }
+-keep class androidx.compose.material.icons.outlined.LanKt { public *; }
+-keep class androidx.compose.material.icons.outlined.LanguageKt { public *; }
+-keep class androidx.compose.material.icons.outlined.LinkKt { public *; }
+-keep class androidx.compose.material.icons.outlined.LocalOfferKt { public *; }
+-keep class androidx.compose.material.icons.outlined.LockKt { public *; }
+-keep class androidx.compose.material.icons.outlined.LoginKt { public *; }
+-keep class androidx.compose.material.icons.outlined.LogoutKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ManageAccountsKt { public *; }
+-keep class androidx.compose.material.icons.outlined.MemoryKt { public *; }
+-keep class androidx.compose.material.icons.outlined.MicNoneKt { public *; }
+-keep class androidx.compose.material.icons.outlined.MoreHorizKt { public *; }
+-keep class androidx.compose.material.icons.outlined.MoreVertKt { public *; }
+-keep class androidx.compose.material.icons.outlined.MotionPhotosOffKt { public *; }
+-keep class androidx.compose.material.icons.outlined.MusicNoteKt { public *; }
+-keep class androidx.compose.material.icons.outlined.MusicOffKt { public *; }
+-keep class androidx.compose.material.icons.outlined.NorthWestKt { public *; }
+-keep class androidx.compose.material.icons.outlined.NotesKt { public *; }
+-keep class androidx.compose.material.icons.outlined.PaletteKt { public *; }
+-keep class androidx.compose.material.icons.outlined.PersonKt { public *; }
+-keep class androidx.compose.material.icons.outlined.PhoneAndroidKt { public *; }
+-keep class androidx.compose.material.icons.outlined.PhoneIphoneKt { public *; }
+-keep class androidx.compose.material.icons.outlined.PlayCircleKt { public *; }
+-keep class androidx.compose.material.icons.outlined.PlaylistAddKt { public *; }
+-keep class androidx.compose.material.icons.outlined.PlaylistPlayKt { public *; }
+-keep class androidx.compose.material.icons.outlined.PlaylistRemoveKt { public *; }
+-keep class androidx.compose.material.icons.outlined.PublicKt { public *; }
+-keep class androidx.compose.material.icons.outlined.QueueMusicKt { public *; }
+-keep class androidx.compose.material.icons.outlined.RadioKt { public *; }
+-keep class androidx.compose.material.icons.outlined.RadioButtonCheckedKt { public *; }
+-keep class androidx.compose.material.icons.outlined.RadioButtonUncheckedKt { public *; }
+-keep class androidx.compose.material.icons.outlined.RefreshKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SearchKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ShowChartKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SignalCellularAltKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SmartButtonKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SmartDisplayKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SortKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SpeakerKt { public *; }
+-keep class androidx.compose.material.icons.outlined.StarKt { public *; }
+-keep class androidx.compose.material.icons.outlined.StarBorderKt { public *; }
+-keep class androidx.compose.material.icons.outlined.StorageKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SurroundSoundKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SwapVertKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SwitchAccountKt { public *; }
+-keep class androidx.compose.material.icons.outlined.SyncKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ThumbDownKt { public *; }
+-keep class androidx.compose.material.icons.outlined.ThumbDownOffAltKt { public *; }
+-keep class androidx.compose.material.icons.outlined.TimerKt { public *; }
+-keep class androidx.compose.material.icons.outlined.TuneKt { public *; }
+-keep class androidx.compose.material.icons.outlined.TvKt { public *; }
+-keep class androidx.compose.material.icons.outlined.UndoKt { public *; }
+-keep class androidx.compose.material.icons.outlined.UpgradeKt { public *; }
+-keep class androidx.compose.material.icons.outlined.UsbKt { public *; }
+-keep class androidx.compose.material.icons.outlined.VideocamKt { public *; }
+-keep class androidx.compose.material.icons.outlined.VolumeDownKt { public *; }
+-keep class androidx.compose.material.icons.outlined.VolumeOffKt { public *; }
+-keep class androidx.compose.material.icons.outlined.VolumeUpKt { public *; }
+-keep class androidx.compose.material.icons.outlined.WarningKt { public *; }
+-keep class androidx.compose.material.icons.outlined.WavesKt { public *; }
+-keep class androidx.compose.material.icons.outlined.WifiKt { public *; }
+
+# Icon getters also require the public Outlined/Filled singleton fields.
+-keep class androidx.compose.material.icons.Icons** { public protected *; }
+
+# Apple Music skin controls.
+-keep class com.music.streamx.ui.icons.StreamXIcons { public *; }
+-keep class androidx.compose.material.icons.rounded.AccountCircleKt { public *; }
+-keep class androidx.compose.material.icons.rounded.AllInclusiveKt { public *; }
+-keep class androidx.compose.material.icons.rounded.DragHandleKt { public *; }
+-keep class androidx.compose.material.icons.rounded.FastForwardKt { public *; }
+-keep class androidx.compose.material.icons.rounded.FastRewindKt { public *; }
+-keep class androidx.compose.material.icons.rounded.JoinInnerKt { public *; }
+-keep class androidx.compose.material.icons.rounded.MoreHorizKt { public *; }
+-keep class androidx.compose.material.icons.rounded.PauseKt { public *; }
+-keep class androidx.compose.material.icons.rounded.PlayArrowKt { public *; }
+-keep class androidx.compose.material.icons.rounded.RepeatKt { public *; }
+-keep class androidx.compose.material.icons.rounded.RepeatOneKt { public *; }
+-keep class androidx.compose.material.icons.rounded.SearchKt { public *; }
+-keep class androidx.compose.material.icons.rounded.SensorsKt { public *; }
+-keep class androidx.compose.material.icons.rounded.ShuffleKt { public *; }
+-keep class androidx.compose.material.icons.rounded.StarKt { public *; }
+-keep class androidx.compose.material.icons.rounded.StarBorderKt { public *; }
+-keep class androidx.compose.material.icons.rounded.VolumeDownKt { public *; }
+-keep class androidx.compose.material.icons.rounded.VolumeUpKt { public *; }
+-keep class androidx.compose.material.icons.rounded.ArrowBackKt { public *; }
+-keep class androidx.compose.material.icons.rounded.PlaylistAddKt { public *; }
+-keep class androidx.compose.material.icons.rounded.QueueMusicKt { public *; }
+-keep class androidx.compose.material.icons.rounded.MicKt { public *; }
+-keep class androidx.compose.material.icons.rounded.AlbumKt { public *; }
+-keep class androidx.compose.material.icons.rounded.MusicNoteKt { public *; }
+-keep class androidx.compose.material.icons.rounded.LibraryMusicKt { public *; }
+-keep class androidx.compose.material.icons.rounded.ChevronRightKt { public *; }
+-keep class androidx.compose.material.icons.automirrored.rounded.ArrowBackKt { public *; }
+
+# Live meter readings consumed by external skins.
+-keep class com.music.streamx.playback.AudioLevels** { public protected *; }

@@ -1,0 +1,52 @@
+# Gradle
+.gradle/
+.vscode/
+/build/
+/app/build/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Local configuration file (SDK path, etc.)
+local.properties
+
+# Kotlin
+.kotlin/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+*.hprof
+
+# Log/OS files
+*.log
+.DS_Store
+Thumbs.db
+
+# Release signing — never commit the key or its passwords
+keystore.properties
+*.jks
+*.keystore
+
+# Project scratch / debug artifacts
+.shots/
+.tmp_verify/
+.debug/
+
+# AI agent configuration
+AGENTS.md
+/output/
+
+# Apple audio tools are rebuilt from Go source for each architecture.
+/extensions/plugins/applemusic/app/src/main/jniLibs/
+
+# Local upstream reference checkouts; the host builds from its own sources.
+/StreamX/
+/apple-music-downloader/

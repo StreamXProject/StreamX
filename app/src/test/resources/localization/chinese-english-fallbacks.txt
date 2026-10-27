@@ -1,0 +1,8 @@
+# Additional existing gaps in Simplified and Traditional Chinese.
+artist_signatures
+artist_signatures_subtitle
+artist_signatures_test_failed
+artist_signatures_unconfigured
+artist_signatures_url
+artist_signatures_url_hint
+signed_by
