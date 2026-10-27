@@ -136,7 +136,7 @@ private data class RepositoryChoice(val packageName: String, val name: String, v
                     .then(if(rowStyle) Modifier.padding(horizontal=ROW_INSET,vertical=10.dp) else Modifier),
                     verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(if(rowStyle) ICON_GAP else 12.dp)) {
                     if(rowStyle) Spacer(Modifier.width(10.dp))
-                    ExtensionLogo(choice.packageName,localVersion,modifier=if(rowStyle) Modifier.size(36.dp) else Modifier)
+                    ExtensionLogo(choice.packageName,localVersion,modifier=if(rowStyle) Modifier.size(36.dp) else Modifier, iconUrl=entry?.iconUrl)
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
                         Text(extensionDisplayName(choice.name,type=="skin"),style=MaterialTheme.typography.bodyLarge)
                         Text(if(embedded) {if(localVersion>0) "Installed · tap to configure" else "Not installed"}

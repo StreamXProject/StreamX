@@ -1,13 +1,11 @@
 package com.music.streamx.ui.screens
 
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Extension
-import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,9 +15,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
-import com.music.streamx.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,51 +23,47 @@ import kotlinx.coroutines.withContext
 internal fun extensionDisplayName(name: String,skin: Boolean): String =
     (if(skin) name.replace(Regex("(?i)\\s+skins?$"),"") else name).replaceFirstChar{it.titlecase()}
 
-/** Preserve brand colors; package drawables must never pass through a tinted Icon. */
-@Composable internal fun ExtensionLogo(packageName: String,version: Long=0,modifier: Modifier=Modifier) {
-    // Brand artwork has its own proportions, independent of a skin's large card radius
-    // and Android's launcher icon mask. Keep installed and downloadable identities identical.
-    val brand = when (packageName.substringAfterLast('.')) {
-        "amazonmusic" -> R.drawable.extension_logo_amazon_music
-        "applemusic" -> R.drawable.extension_logo_apple_music
-        "spotify", "spotui" -> R.drawable.extension_logo_spotui
-        else -> null
-    }
-    if (brand != null) {
-        Image(painterResource(brand), null,
-            modifier.size(44.dp), contentScale = ContentScale.Fit)
-        return
-    }
-    if(packageName=="com.music.streamx.cloudstream") {
-        Icon(Icons.Rounded.Cloud,null,modifier.size(44.dp),
-            tint=MaterialTheme.colorScheme.onSurface)
-        return
-    }
-    val context=LocalContext.current
-    val bitmap by produceState<ImageBitmap?>(null,packageName,version) {
-        value=withContext(Dispatchers.IO) {
+/** Artwork belongs to extensions: installed APK first, repository URL otherwise. */
+@Composable internal fun ExtensionLogo(
+    packageName: String,
+    version: Long = 0,
+    modifier: Modifier = Modifier,
+    iconUrl: String? = null,
+) {
+    val context = LocalContext.current
+    val bitmap by produceState<ImageBitmap?>(null, packageName, version) {
+        value = withContext(Dispatchers.IO) {
             try {
-                val fallback=when(packageName.substringAfterLast('.')) {
-                    "applemusic" -> R.drawable.extension_logo_apple_music
-                    "spotui", "spotify" -> R.drawable.extension_logo_spotui
-                    "comic" -> R.drawable.extension_logo_comic
-                    "dot" -> R.drawable.extension_logo_dot
-                    "looper" -> R.drawable.extension_logo_looper
-                    "expressive" -> R.drawable.extension_logo_material_expressive
-                    "material" -> R.drawable.extension_logo_material_ui_3
-                    "meridian" -> R.drawable.extension_logo_meridian
-                    else -> 0
-                }
-                val info=runCatching {context.packageManager.getApplicationInfo(packageName,0)}.getOrNull()
-                val drawable=if((info==null || info.icon==0) && fallback!=0)ContextCompat.getDrawable(context,fallback)
-                    else info?.let {context.packageManager.getApplicationIcon(it)}
-                drawable?.toBitmap(144,144)?.asImageBitmap()
-            } catch(cancelled: CancellationException) {throw cancelled}
-            catch(_: Exception) {null}
+                val info = context.packageManager.getApplicationInfo(packageName, 0)
+                if (info.icon == 0) null else context.packageManager.getApplicationIcon(info).toBitmap(144, 144).asImageBitmap()
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
         }
     }
-    val size=modifier.size(44.dp)
-    bitmap?.let{Image(it,null,size)} ?: Icon(Icons.Rounded.Extension,null,size.padding(8.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+    val url = remember(iconUrl) { iconUrl?.let(com.music.streamx.data.extensions.ExtensionRepository::safeIconUrl) }
+    val size = modifier.size(44.dp)
+    when {
+        bitmap != null -> Image(requireNotNull(bitmap), null, size, contentScale = ContentScale.Fit)
+        url != null -> {
+            var loaded by remember(url) { mutableStateOf(false) }
+            Box(size, contentAlignment = Alignment.Center) {
+                if (!loaded) Icon(Icons.Rounded.Extension, null, Modifier.fillMaxSize().padding(8.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                coil3.compose.AsyncImage(
+                    model = remember(context, url) {
+                        coil3.request.ImageRequest.Builder(context).data(url)
+                            .memoryCacheKey(url).diskCacheKey(url).build()
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    onLoading = { loaded = false },
+                    onSuccess = { loaded = true },
+                    onError = { loaded = false },
+                )
+            }
+        }
+        else -> Icon(Icons.Rounded.Extension, null, size.padding(8.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable internal fun ExtensionIdentityRow(packageName: String,version: Long=0,title: String,subtitle: String?,

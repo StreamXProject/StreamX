@@ -23,6 +23,7 @@ internal data class RepositoryExtension(
     val type: String,val abis: List<String>,val minSdk: Int,val apkUrl: String,
     val sha256: String,val certificateSha256: String,val size: Long,
     val repositoryUrl: String? = null, val repositoryName: String? = null,
+    val iconUrl: String? = null,
 )
 
 internal data class RepositoryCatalogue(val entries: List<RepositoryExtension>, val errors: List<String>)
@@ -33,6 +34,13 @@ internal object ExtensionRepository {
     private val client=OkHttpClient.Builder().followSslRedirects(false).connectTimeout(20,TimeUnit.SECONDS)
         .readTimeout(60,TimeUnit.SECONDS).callTimeout(10,TimeUnit.MINUTES).build()
     private const val MAX_APK=200L*1024*1024
+    internal fun safeIconUrl(value: String): String? = runCatching {
+        val uri = URI(value.trim())
+        value.trim().takeIf {
+            uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null && uri.fragment == null
+        }
+    }.getOrNull()
+
     internal fun indexUrl(type: String): String {
         check(type == "skin" || type == "plugin") { "Unknown extension type" }
         return "https://streamxproject.github.io/StreamX-Releases/extensions/index.json"
@@ -50,7 +58,8 @@ internal object ExtensionRepository {
         val all=(0 until array.length()).map {i->val item=array.getJSONObject(i);val abis=item.getJSONArray("abis")
             RepositoryExtension(item.getString("name"),item.getString("packageName"),item.getLong("versionCode"),item.getString("versionName"),
                 item.getString("type"),(0 until abis.length()).map{abis.getString(it)},item.getInt("minSdk"),item.getString("apkUrl"),
-                item.getString("sha256"),item.getString("certificateSha256"),item.getLong("size"),source?.url,source?.name)
+                item.getString("sha256"),item.getString("certificateSha256"),item.getLong("size"),source?.url,source?.name,
+                safeIconUrl(item.optString("iconUrl")))
         }.filter{it.type==type && it.minSdk<=sdk && (it.abis.isEmpty() || it.abis.any{abi->abi in supportedAbis})}
         all.forEach {item->
             check(item.packageName.matches(Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+"))){"Invalid extension package"}

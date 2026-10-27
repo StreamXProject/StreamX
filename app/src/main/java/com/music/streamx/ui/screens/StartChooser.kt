@@ -178,7 +178,7 @@ internal fun StartChooser(
                         badge = TileBadge.INSTALLED,
                         onClick = {},
                         modifier = modifier,
-                    ) { ExtensionLogo(entry.packageName, entry.versionCode, Modifier.size(40.dp)) }
+                    ) { ExtensionLogo(entry.packageName, entry.versionCode, Modifier.size(40.dp), iconUrl = entry.iconUrl) }
                 }
             }
             plugins.filter { it.packageName !in installedPackages && (it.packageName != CloudStream.PACKAGE || cloudVersion == null) }.forEach { entry ->
@@ -193,7 +193,7 @@ internal fun StartChooser(
                         progress = downloads.progress,
                         onClick = { download(entry) },
                         modifier = modifier,
-                    ) { ExtensionLogo(entry.packageName, 0, Modifier.size(40.dp)) }
+                    ) { ExtensionLogo(entry.packageName, 0, Modifier.size(40.dp), iconUrl = entry.iconUrl) }
                 }
             }
             add { modifier ->
@@ -418,7 +418,7 @@ private fun StartSkinStrip(
                     progress = downloads.progress,
                     dimmed = true,
                     onClick = { onDownload(entry) },
-                ) { ExtensionLogo(entry.packageName, 0, Modifier.size(60.dp).clip(CircleShape)) }
+                ) { ExtensionLogo(entry.packageName, 0, Modifier.size(60.dp).clip(CircleShape), iconUrl = entry.iconUrl) }
             }
         }
         error?.let {

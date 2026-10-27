@@ -14,6 +14,16 @@ class ExtensionRepositoryTest {
         .put("sha256","a".repeat(64)).put("certificateSha256",ExtensionRepository.SIGNER).put("size",1234)
     private fun parse(vararg entries: JSONObject)=ExtensionRepository.parseIndex(
         JSONObject().put("schemaVersion",1).put("extensions",JSONArray(entries.toList())).toString(),"skin",listOf("arm64-v8a","armeabi-v7a"),36)
+    @Test fun optionalExtensionIconsRemainBackwardsCompatible() {
+        assertNull(parse(entry()).single().iconUrl)
+        val url = "https://extensions.example/icons/comic.svg"
+        assertEquals(url, parse(entry().put("iconUrl", url)).single().iconUrl)
+    }
+    @Test fun unsafeIconsDoNotBreakTheCatalogue() {
+        listOf("http://example.com/icon.png", "file:///tmp/icon.png", "https://user:password@example.com/icon.png", "not a URL").forEach { url ->
+            assertNull(parse(entry().put("iconUrl", url)).single().iconUrl)
+        }
+    }
     @Test fun choosesNewestCompatibleAbi() {
         assertEquals(13L,parse(entry(version=12),entry("x86_64",14),entry("arm64-v8a",13)).single().versionCode)
     }
