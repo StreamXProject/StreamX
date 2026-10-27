@@ -1,15 +1,6 @@
 name: Build StreamX
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
-    inputs:
-      existing_run_id:
-        description: 'Optional successful Build StreamX run ID to publish without rebuilding'
-        required: false
-        type: string
 permissions:
   contents: read
 concurrency:
@@ -17,7 +8,6 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    if: github.event_name != 'workflow_dispatch' || inputs.existing_run_id == ''
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -36,7 +26,6 @@ jobs:
         run: sdkmanager "platforms;android-36" "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
       - name: Configure release signing
-        if: github.event_name != 'pull_request'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -44,7 +33,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: python3 .github/scripts/configure-signing.py
       - name: Build ARM64 release APK
-        run: ./gradlew --no-daemon --max-workers=2 -PstreamxAbis=arm64-v8a :app:assembleProdRelease
+        run: ./gradlew --no-daemon --max-workers=2 -PstreamxAbis=arm64-v8a -PappBuildNumber=${{ github.run_number }} :app:assembleProdRelease
       - name: Upload ARM64 APK
         uses: actions/upload-artifact@v4
         with:
@@ -52,7 +41,7 @@ jobs:
           path: app/build/outputs/apk/prod/release/app-prod-arm64-v8a-release.apk
           if-no-files-found: error
       - name: Run unit tests
-        run: ./gradlew --no-daemon --max-workers=2 -PstreamxAbis=arm64-v8a :app:testProdReleaseUnitTest
+        run: ./gradlew --no-daemon --max-workers=2 -PstreamxAbis=arm64-v8a -PappBuildNumber=${{ github.run_number }} :app:testProdReleaseUnitTest
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -62,55 +51,33 @@ jobs:
             app/build/reports/tests/
             app/build/test-results/
   publish:
-    name: Publish manual build
+    name: Publish StreamX release
     needs: build
-    if: always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.existing_run_id != ''))
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       actions: read
     steps:
-      - name: Resolve tested build
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Resolve release version
         id: source
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          EXISTING_RUN_ID: ${{ inputs.existing_run_id }}
         shell: python
         run: |
-          import base64, datetime, json, os, re, subprocess
-          run_id = os.environ['EXISTING_RUN_ID'] or os.environ['GITHUB_RUN_ID']
-          if not run_id.isdigit():
-              raise SystemExit('Run ID must be a number')
-          run = json.loads(subprocess.check_output([
-              'gh', 'api', f"repos/{os.environ['GH_REPO']}/actions/runs/{run_id}"
-          ]))
-          if os.environ['EXISTING_RUN_ID']:
-              if (run['conclusion'] != 'success' or run['head_branch'] != 'main'
-                      or run['path'] != '.github/workflows/build.yml'
-                      or run['event'] not in ('push', 'workflow_dispatch')):
-                  raise SystemExit('Only successful main-branch host builds can be published')
-              sha = run['head_sha']
-          else:
-              sha = os.environ['GITHUB_SHA']
-          source = json.loads(subprocess.check_output([
-              'gh', 'api', f"repos/{os.environ['GH_REPO']}/contents/app/build.gradle.kts?ref={sha}"
-          ]))
-          gradle = base64.b64decode(source['content']).decode()
-          match = re.search(r'versionName\s*=\s*"([0-9]+(?:\.[0-9]+)+)"', gradle)
-          if not match:
-              raise SystemExit('Could not read the app release version')
-          version = match.group(1)
-          stamp = datetime.datetime.fromisoformat(run['created_at'].replace('Z', '+00:00')).strftime('%Y%m%d%H%M%S')
-          tag = f'v{version}-preview.{stamp}'
+          import os, re
+          from pathlib import Path
+          gradle = Path('app/build.gradle.kts').read_text()
+          base = re.search(r'val appBaseVersion = "([0-9]+(?:\.[0-9]+)+)"', gradle).group(1)
+          version = f"{base}.{os.environ['GITHUB_RUN_NUMBER']}"
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-              out.write(f'run_id={run_id}\nsha={sha}\nversion={version}\ntag={tag}\n')
+              out.write(f'version={version}\ntag=v{version}\n')
       - name: Download tested APK
         uses: actions/download-artifact@v4
         with:
           name: StreamX-arm64-v8a-release
           path: release
-          run-id: ${{ steps.source.outputs.run_id }}
           github-token: ${{ github.token }}
       - name: Publish APK to Releases
         env:
@@ -118,8 +85,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.source.outputs.tag }}
           APP_VERSION: ${{ steps.source.outputs.version }}
-          COMMIT_SHA: ${{ steps.source.outputs.sha }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ steps.source.outputs.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -134,10 +101,9 @@ jobs:
 
           Built from commit \`$COMMIT_SHA\`. Release build and unit tests passed in [GitHub Actions]($RUN_URL).
 
-          This build keeps the app version declared in Gradle. It is published separately from numbered stable releases.
           EOF
           # Keep the source tag exact while using the default branch for the
-          # release API's workflow-permission check (also applies to old runs).
+          # release API's workflow-permission check.
           if ! gh api "repos/$GH_REPO/git/ref/tags/$tag" > /dev/null 2>&1; then
             gh api "repos/$GH_REPO/git/refs" -f "ref=refs/tags/$tag" -f "sha=$COMMIT_SHA"
           fi
@@ -147,9 +113,10 @@ jobs:
             gh release upload "$tag" "release/$apk" release/SHA256SUMS.txt --clobber
           else
             gh release create "$tag" "release/$apk" release/SHA256SUMS.txt \
-              --verify-tag --title "StreamX $APP_VERSION Preview" \
-              --prerelease --notes-file release/notes.md
+              --verify-tag --title "StreamX $APP_VERSION" \
+              --latest --notes-file release/notes.md
           fi
+          gh release edit "$tag" --title "StreamX $APP_VERSION" --prerelease=false --latest --notes-file release/notes.md
       - name: Record public release tag
         env:
           RELEASE_TAG: ${{ steps.source.outputs.tag }}

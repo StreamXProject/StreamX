@@ -37,7 +37,7 @@ class PublicationTests(unittest.TestCase):
         self.mock = patch.object(publisher, 'gh', self.gh)
         self.mock.start()
         self.addCleanup(self.mock.stop)
-        publisher.TAG = 'v1.8'
+        publisher.TAG = 'v1.8.5'
 
     def gh(self, token, *args, check=True):
         self.calls.append((token, args))
@@ -83,6 +83,8 @@ class PublicationTests(unittest.TestCase):
         self.assertNotIn('SECRET', self.notes)
         edit = self.calls[-1][1]
         self.assertIn('--latest=true', edit)
+        self.assertIn('--prerelease=false', edit)
+        self.assertEqual(edit[edit.index('--title') + 1], 'StreamX 1.8.5')
         create = next(args for _, args in self.calls if args[1] == 'create')
         self.assertEqual(create[create.index('--target') + 1], 'main')
         self.assertNotIn('private-commit', create)

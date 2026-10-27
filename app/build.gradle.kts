@@ -14,6 +14,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+val appBaseVersion = "1.8"
+
 /**
  * Signing details, kept out of the repository in `keystore.properties`
  * (see keystore.properties.example). Absent on a fresh checkout, in which case
@@ -143,8 +145,14 @@ android {
         // Haze falls back to a translucent scrim below that.
         minSdk = 26
         targetSdk = 36
-        versionCode = 26
-        versionName = "1.8"
+        // CI passes -PappBuildNumber=N (the workflow's run number), so each
+        // published build is 1.8.N with a code above every earlier one, as
+        // skins are. Local builds stay plain 1.8.
+        val appBuildNumber = providers.gradleProperty("appBuildNumber").orNull?.toInt()?.also {
+            require(it in 1..9999) { "appBuildNumber must be between 1 and 9999" }
+        }
+        versionCode = if (appBuildNumber == null) 26 else 26 * 10000 + appBuildNumber
+        versionName = if (appBuildNumber == null) appBaseVersion else "$appBaseVersion.$appBuildNumber"
         buildConfigField("String", "UPDATE_APK_PREFIX", "\"StreamX-\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
