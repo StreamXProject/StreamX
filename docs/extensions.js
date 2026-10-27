@@ -28,7 +28,7 @@ window.streamxCatalogue = window.streamxExtensionManifest.then(manifest => {
     const newest = Math.max(...variants.map(entry => entry.versionCode));
     const current = variants.filter(entry => entry.versionCode === newest);
     const first = current[0];
-    const item = {id: first.id, type: first.type, name: displayName(first), version: first.versionName, logo: first.iconUrl || logoUrl(first), variants: current};
+    const item = {id: first.id, type: first.type, name: displayName(first), version: first.versionName, logo: logoUrl(first), variants: current};
     (first.type === 'plugin' ? plugins : skins).push(item);
   }
   skins.sort((a, b) => a.name.localeCompare(b.name));
