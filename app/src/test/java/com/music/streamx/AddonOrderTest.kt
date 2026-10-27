@@ -22,10 +22,12 @@ import org.junit.Test
 class AddonOrderTest {
 
     private val before = SourceRegistry.configs.value
+    private val beforeOrder = SourceRegistry.playbackOrder.value
 
     @After
     fun tearDown() {
         SourceRegistry.configs.value = before
+        SourceRegistry.playbackOrder.value = beforeOrder
     }
 
     private fun addon(name: String) = SourceConfig(
@@ -39,12 +41,13 @@ class AddonOrderTest {
         SourceRegistry.configs.value = addons +
             SourceConfig(kind = SourceKind.JIOSAAVN) +
             SourceConfig(kind = SourceKind.YOUTUBE)
+        SourceRegistry.playbackOrder.value = emptyList()
         return addons
     }
 
-    /** The user-added sources in stored order, which is the order they are tried. */
+    /** The user-added sources in playback order, which is the order they are tried. */
     private fun addonLabels() =
-        SourceRegistry.configs.value.filter { it.kind.isUserAdded }.map { it.label }
+        SourceRegistry.ordered(SourceRegistry.configs.value).filter { it.kind.isUserAdded }.map { it.label }
 
     @Test
     fun `reordering puts the addons in the order given`() {

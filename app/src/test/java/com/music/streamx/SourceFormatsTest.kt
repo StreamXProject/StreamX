@@ -139,23 +139,21 @@ class SourceFormatsTest {
     }
 
     /**
-     * A registry of downloadable plugin bundles for another app. Nothing here
-     * knows what those bundles are, and nothing should: what it gets is the
-     * same answer as any other unrecognised index, naming the list it holds so
-     * the link is not mistaken for a typo.
+     * A SpotiFLAC registry: download providers shipped as `.sflx` bundles. It
+     * is read as a module index of those providers, under SpotiFLAC's name,
+     * since its address alone is only a GitHub host.
      */
     @Test
-    fun `an extension registry falls to the generic unrecognised answer`() {
+    fun `a SpotiFLAC registry is read as a module index`() {
         val body = """
             {"version":1,"updated_at":"2026-08-30T00:00:00Z","extensions":[
-              {"id":"deezer","display_name":"Deezer","download_url":"https://x/deezer.sflx"},
-              {"id":"qobuz-web","display_name":"Qobuz","download_url":"https://x/qobuz-web.sflx"}]}
+              {"id":"deezer","display_name":"Deezer","category":"download","download_url":"https://x/deezer.sflx"},
+              {"id":"qobuz-web","display_name":"Qobuz","category":"download","download_url":"https://x/qobuz-web.sflx"}]}
         """.trimIndent()
 
-        val reason = reason(SourceFormats.detect(body, "https://host/registry.json"))
+        val detected = SourceFormats.detect(body, "https://host/registry.json")
 
-        assertTrue(reason, reason.contains("extensions"))
-        assertTrue(reason, reason.contains("not a format StreamX reads"))
+        assertEquals(DetectedFormat.ModuleIndex(2, "https://host/registry.json", name = "SpotiFLAC"), detected)
     }
 
     @Test

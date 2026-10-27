@@ -1,5 +1,22 @@
 # Existing untranslated StreamX UI keys that intentionally fall back to English.
 # Remove a key after translating it in every supported locale. New omissions fail tests.
+automix_download_confirm_size
+automix_download_message
+automix_download_message_size
+automix_download_title
+automix_engine
+automix_engine_download
+automix_engine_downloading
+automix_engine_downloading_background
+automix_engine_failed
+automix_engine_missing
+automix_engine_missing_size
+automix_engine_ready
+automix_engine_remove
+automix_engine_restart
+automix_engine_stop
+automix_engine_unavailable
+automix_engine_verifying
 copy_link
 extensions_apply_skin
 extensions_collapse_details

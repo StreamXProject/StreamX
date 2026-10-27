@@ -18,13 +18,16 @@ class FloatingTabBarScrollTest {
         connection.onPostScroll(Offset(0f,60f),Offset.Zero,NestedScrollSource.UserInput)
         assertFalse(connection.isInline)
     }
-    @Test fun draggingBlankSpaceOrPastAnEdgeCannotResizeDock() {
+    @Test fun draggingBlankSpaceOrPastTheEndCannotFoldDock() {
         val connection=FloatingTabBarScrollConnection(scrollThresholdPx=50f)
         repeat(4) {connection.onPostScroll(Offset.Zero,Offset(0f,-200f),NestedScrollSource.UserInput)}
         assertFalse(connection.isInline)
+    }
+    @Test fun pullingDownPastTheTopExpandsDock() {
+        val connection=FloatingTabBarScrollConnection(scrollThresholdPx=50f)
         connection.inline()
-        repeat(4) {connection.onPostScroll(Offset.Zero,Offset(0f,200f),NestedScrollSource.UserInput)}
-        assertTrue(connection.isInline)
+        connection.onPostScroll(Offset.Zero,Offset(0f,200f),NestedScrollSource.UserInput)
+        assertFalse(connection.isInline)
     }
     @Test fun realContentMovementStillFoldsAndExpands() {
         val connection=FloatingTabBarScrollConnection(scrollThresholdPx=50f)

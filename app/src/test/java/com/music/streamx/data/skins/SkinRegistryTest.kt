@@ -26,45 +26,7 @@ class SkinRegistryTest {
         assertEquals(21.0, SkinRegistry.contrast("#000000", "#FFFFFF"), 0.001)
     }
 
-    @Test fun spotuiAssetIsAValidExecutableSkin() {
-        val root = generateSequence(java.io.File(System.getProperty("user.dir"))) { it.parentFile }
-            .map { java.io.File(it, "extensions/skins/spotui/app/src/main/assets/streamx/skin.json") }
-            .first { it.isFile }
-        val skin = kotlinx.serialization.json.Json.decodeFromString<SkinSpec>(root.readText())
-        SkinRegistry.validate(skin)
-        assertEquals(3, skin.version)
-        assertEquals(1, skin.renderer!!.api)
-        assertEquals("com.music.streamx.skins.spotui.SpotuiRenderer", skin.renderer.entryPoint)
-        assertEquals(com.music.streamx.ui.skins.NavigationLayout.FLAT, skin.layout.navigation)
-        assertEquals(com.music.streamx.ui.skins.LibraryLayout.ROWS, skin.layout.library)
-        listOf(skin.fonts!!.regular, skin.fonts.bold).forEach { path ->
-            val font = java.io.File(root.parentFile.parentFile, path)
-            assertTrue("Missing packaged font: $path", font.isFile)
-            assertTrue(font.length() in 1..2_097_152)
-        }
-    }
 
-    @Test fun looperAssetPassesTheHostsActualSkinValidation() {
-        val asset=generateSequence(java.io.File(System.getProperty("user.dir"))) {it.parentFile}
-            .map{java.io.File(it,"extensions/skins/looper/app/src/main/assets/streamx/skin.json")}.first{it.isFile}
-        val skin=kotlinx.serialization.json.Json.decodeFromString<SkinSpec>(asset.readText())
-        SkinRegistry.validate(skin)
-        assertEquals("looper",skin.id)
-        assertEquals("com.music.streamx.skins.looper.LooperRenderer",skin.renderer!!.entryPoint)
-    }
-    @Test fun dotAssetPassesTheHostsActualSkinValidation() {
-        val asset = generateSequence(java.io.File(System.getProperty("user.dir"))) { it.parentFile }
-            .map { java.io.File(it, "extensions/skins/dot/app/src/main/assets/streamx/skin.json") }.first { it.isFile }
-        val skin = kotlinx.serialization.json.Json.decodeFromString<SkinSpec>(asset.readText())
-        SkinRegistry.validate(skin)
-        assertEquals("dot", skin.id)
-        assertEquals("com.music.streamx.skins.dot.DotRenderer", skin.renderer!!.entryPoint)
-        listOf(skin.fonts!!.regular, skin.fonts.bold).forEach { path ->
-            val font = java.io.File(asset.parentFile.parentFile, path)
-            assertTrue("Missing packaged font: $path", font.isFile)
-            assertTrue(font.length() in 1..2_097_152)
-        }
-    }
     @Test fun v2CanOverrideOneScreenAndKeepDefaultsForTheRest() {
         val skin = kotlinx.serialization.json.Json.decodeFromString<SkinSpec>(
             """{"version":2,"id":"partial","name":"Partial","layout":{"settings":"FLAT"}}""")

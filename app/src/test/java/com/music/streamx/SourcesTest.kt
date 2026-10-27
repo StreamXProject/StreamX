@@ -1214,57 +1214,42 @@ class SourcesTest {
     }
 
     /**
-     * The '9:45' case itself, as a race rather than a queue.
-     *
-     * JioSaavn answered in ~0.4s and the module in ~13.5s. Walked in rank order
-     * the module's slowness was JioSaavn's too, so the whole lookup lost the
-     * race against YouTube and the listener got 160kbps Opus. Raced, the quick
-     * answer is the one that starts the track — and the slow source is left to
-     * [SourceResolver.upgradeFor], which judges it against what is playing.
+     * Playback asks sources in the listener's saved order. A higher-ranked
+     * source answers even when one below it would have been quicker: the order
+     * is the listener's choice, not a hint to beat.
      */
     @Test
-    fun `takes the quick answer rather than waiting for a slow better one`() = runBlocking {
-        val slow = FakeSource("Ricky's Addon", answerAfterMs = 2_000, format = StreamFormat("flac"))
-        val quick = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
-        val elapsed = measureTimeMillis {
-            val (source, stream) = SourceResolver.bestAcross(
-                listOf(slow, quick), raceTarget(), StreamRequest.Lossless,
-            )!!
-            assertEquals("JioSaavn", source.displayName)
-            assertEquals(320, stream.format.kbps)
-        }
-        // Nowhere near the slow source's two seconds.
-        assertTrue("took ${elapsed}ms, so it waited for the slow source", elapsed < 1_000)
-        // Asked, though — being beaten is not the same as being skipped, and
-        // skipping is the bug this replaced.
-        assertTrue(slow.asked)
+    fun `takes the higher-ranked source even when a lower one is quicker`() = runTest {
+        val ranked = FakeSource("Ricky's Addon", answerAfterMs = 2_000, format = StreamFormat("flac"))
+        val quicker = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
+        val (source, stream) = SourceResolver.bestAcross(
+            listOf(ranked, quicker), raceTarget(), StreamRequest.Lossless,
+        )!!
+        assertEquals("Ricky's Addon", source.displayName)
+        assertEquals("flac", stream.format.codec)
+    }
+
+    /** Once a source has answered, the ones below it are not asked at all. */
+    @Test
+    fun `does not ask lower-ranked sources once one has answered`() = runTest {
+        val ranked = FakeSource("Ricky's Addon", answerAfterMs = 5, format = StreamFormat("flac"))
+        val lower = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
+        SourceResolver.bestAcross(listOf(ranked, lower), raceTarget(), StreamRequest.Lossless)
+        assertTrue("the ranked source was not asked", ranked.asked)
+        assertTrue("a lower-ranked source was asked anyway", !lower.asked)
     }
 
     /**
-     * A slow source is cancelled once an answer is in hand rather than left
-     * running: nothing is waiting on it, and the second look re-asks it
-     * properly. Left running it would spend a listener's radio for nothing.
+     * The background upgrade still asks every source at once, and answers that
+     * arrive together are ranked by quality there.
      */
     @Test
-    fun `abandons the sources still running once it has an answer`() = runBlocking {
-        val slow = FakeSource("Ricky's Addon", answerAfterMs = 2_000, format = StreamFormat("flac"))
-        val quick = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
-        SourceResolver.bestAcross(listOf(slow, quick), raceTarget(), StreamRequest.Lossless)
-        assertTrue("the slow source was left running", slow.cancelled)
-    }
-
-    /**
-     * Answers that arrive together are still ranked. Racing gives up ordering
-     * between a fast source and a slow one; it does not give up ordering
-     * between two that answered at the same moment.
-     */
-    @Test
-    fun `prefers the better of two answers that arrive together`() = runTest {
+    fun `an upgrade prefers the better of two answers that arrive together`() = runTest {
         // Identical virtual deadlines make this a tie; real 5 ms sleeps can race under CI load.
         val worse = FakeSource("Ricky's Addon", answerAfterMs = 5, format = StreamFormat("mp3", kbps = 128))
         val better = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
         val (source, stream) = SourceResolver.bestAcross(
-            listOf(worse, better), raceTarget(), StreamRequest.Lossless,
+            listOf(worse, better), raceTarget(), StreamRequest.Lossless, waitForAll = true,
         )!!
         assertEquals("JioSaavn", source.displayName)
         assertEquals(320, stream.format.kbps)
