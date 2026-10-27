@@ -1,59 +1,37 @@
-# Public downloads
+# Publishing StreamX
 
-Repository layout:
+- **StreamX** owns app source, numbered app releases and the website in `docs/`.
+- **Skins** owns public skin APKs, artwork and its discovery index.
+- **Plugins** remains private. Its publisher mirrors only plugin APKs and icons to **StreamX-Releases**.
+- **StreamX-Releases** retains the unified extension catalogue, historical APKs and existing Automix packages. Its former website redirects to StreamX.
 
-- `StreamXProject/StreamX`: public app source, builds and tests (visibility migration pending; see below).
-- `StreamXProject/Plugins`: private plugin implementations.
-- `StreamXProject/Skins`: public skin implementations and downloads.
-- `StreamXProject/StreamX-Releases`: public website in `docs/`, APK releases and optional Automix packages.
+Website: https://streamxproject.github.io/StreamX/
 
-Website: https://streamxproject.github.io/StreamX-Releases/
+## App releases
 
-The existing StreamX repository is still private because its Git history includes `extensions/plugins/`. Changing visibility directly would publish those plugin implementations. A clean source snapshot is prepared locally. Preserve the old history in a private archive and create a clean public app repository after the migration is approved; do not change visibility before separating the histories.
+Start **Build StreamX** manually on `main`. The workflow builds and tests a signed ARM64 APK, using `1.8.<run number>` and version code `260000 + run number`, then publishes a normal latest release in StreamX. Local builds stay at version 1.8 / code 26. No app mirror or cross-repository publishing token is needed.
 
-## One-time credential setup
+The website and app updater read StreamX releases directly. Historical app releases in StreamX-Releases remain available to older installed versions.
 
-Create a fine-grained personal access token with **StreamXProject** as resource owner. Select only **StreamX-Releases** and grant **Contents: Read and write**. Approve the token in the organization if required. Save it in the **StreamX source repository** under Settings → Secrets and variables → Actions as `PUBLIC_RELEASE_TOKEN`. Rotate it before expiry.
+## Extensions
 
-Do not put the token in the public repository, app configuration or APK. The source workflow's built-in token reads source release assets; the restricted token writes public assets.
+Both official extension screens continue using the backwards-compatible public catalogue:
+https://streamxproject.github.io/StreamX-Releases/extensions/index.json
 
-## Publishing
+Skins builds export extension-owned icons and publish a signed APK catalogue in the `repo` release. **Sync direct skin links** in StreamX-Releases reads that index hourly, or on manual dispatch, and updates only its skin entries. APKs and icons link directly to Skins releases; they are not copied. The sync refuses missing or downgraded skins and untrusted download URLs or signers.
 
-The existing **Build StreamX** manual workflow builds, tests, signs and publishes a source preview release. Its completion starts **Publish public downloads**, which mirrors the exact release tag. Ordinary push and PR builds do not publish publicly. Releases created by Actions with `GITHUB_TOKEN` do not start another `release` workflow; the `workflow_run` trigger handles that case.
+Private Plugins publishing preserves these direct skin entries. Its `PUBLIC_RELEASE_TOKEN` is restricted to Contents read/write on StreamX-Releases. No user credential is embedded in the app or catalogue.
 
-Publishing a source release through GitHub also triggers the mirror. To retry or mirror a historical release, run **Publish public downloads** manually with the source tag (for example `v1.8` or `automix-1`). For releases created by other automated workflows using `GITHUB_TOKEN`, dispatch the public publishing workflow explicitly.
+## Website
 
-App tags must start with `v` and a numeric dotted version. Stable versions are marked latest; previews preserve prerelease status and never become latest. The public download filename `StreamX.apk` is an ARM64 alias; architecture-specific names are retained for the in-app updater. Each release includes freshly calculated `SHA256SUMS.txt`.
+GitHub Pages serves `/docs` from `main` in StreamX. Preview locally with:
 
-Private release notes are deliberately replaced with public installation notes; add public changelog text to the public release separately after publishing. Retrying a publish replaces these notes. Source commit references and private Actions links are not copied. Public tags point to public website commits.
+```sh
+python3 -m http.server 8000 --directory docs
+```
 
-## Automix
+The site reads app releases from StreamX, the combined public extension catalogue from StreamX-Releases, and existing Automix releases from StreamX-Releases. Screenshot instructions live in `docs/assets/screens/README.md`.
 
-Run `./gradlew :app:packageAutomix`. Upload **only** these files from `app/build/automix-package/` to a source release tagged `automix-N`, where N matches `automixPackageVersion`:
+## Legacy Automix packages
 
-- `automix-manifest.json`
-- `streamx-automix-N-arm64-v8a.zip`
-- `streamx-automix-N-armeabi-v7a.zip`
-- `streamx-automix-N-x86_64.zip`
-
-Publish that release, or manually dispatch the mirror if it was created by an Actions token. The mirror verifies archive checksums, all internal file checksums, the package version, runtime and ABI before publishing. It never marks Automix as the latest app release.
-
-The default app URL is pinned to public `automix-1`. When bumping `automixPackageVersion`, also update that URL (or set `STREAMX_AUTOMIX_BASE_URL`). The public mirror keeps filenames and manifest bytes unchanged. The app retains its compiled native engine pins and runtime compatibility checks. An explicit empty environment/local property disables downloads.
-
-Existing installed APKs retain their compiled URLs; install a build containing the new public URLs to use anonymous in-app downloads and updates. Moving release files cannot change an APK already installed.
-
-## Website maintenance
-
-The public repository's GitHub Pages configuration serves `/docs` from `main`. Its JavaScript reads public release metadata to display versions, dates, sizes and package links. Static GitHub links remain available if JavaScript is disabled or the API is rate limited. No source checkout is deployed publicly.
-
-## Public plugins and skins from private source
-
-`StreamXProject/Plugins` stays private and builds four plugins plus eighteen skins. Its internal manifest is retained for build verification. A separate public mirror publishes only tested APKs and a filtered v1 manifest to `StreamXProject/StreamX-Releases`.
-
-Both official extension screens now read `https://streamxproject.github.io/StreamX-Releases/extensions/index.json`, filtering on each entry's `type`. Every download URL in that manifest points to a public `StreamX-Releases` asset. The app sends no GitHub credential to the public manifest or these public APKs. Users need no GitHub account or token. Legacy private Plugins URLs remain supported only for older catalogue entries, and public Skins URLs remain supported for existing skin releases.
-
-The private repository's **Publish public extension downloads** workflow runs after a successful combined build, or can mirror the current tested release manually without rebuilding. Set `PUBLIC_RELEASE_TOKEN` in the private **Plugins** repository to a fine-grained token restricted to **StreamX-Releases**, with Contents read/write. This credential is for the publishing service only; it is never included in the public site, manifest or APK.
-
-Public extension releases use `extensions-v…` tags and never become the latest app release. The mirror checks source identity, signing pins, APK sizes and SHA-256 checksums, uploads APKs, then commits only `docs/extensions/index.json` to the public repository. It refuses a manifest that downgrades or removes already published packages.
-
-The website reads the same public manifest for its plugin download list, complete skin downloads and current skin APK links. The eight illustrative skin previews retain bundled fallback links if the manifest is unavailable.
+Existing Automix URLs remain unchanged. **Mirror legacy Automix packages** is a manual workflow accepting only `automix-N` tags; it requires `PUBLIC_RELEASE_TOKEN` for StreamX-Releases. It validates archive and internal checksums before publication. App releases do not trigger it.

@@ -1568,7 +1568,7 @@ fun SettingsScreen(
                     append("Discord")
                 }
                 append("  ")
-                withLink(LinkAnnotation.Url("https://streamxproject.github.io/StreamX-Releases/", linkStyles)) {
+                withLink(LinkAnnotation.Url("https://streamxproject.github.io/StreamX/", linkStyles)) {
                     append("Website")
                 }
             },

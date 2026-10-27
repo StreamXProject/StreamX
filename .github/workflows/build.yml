@@ -117,13 +117,3 @@ jobs:
               --latest --notes-file release/notes.md
           fi
           gh release edit "$tag" --title "StreamX $APP_VERSION" --prerelease=false --latest --notes-file release/notes.md
-      - name: Record public release tag
-        env:
-          RELEASE_TAG: ${{ steps.source.outputs.tag }}
-        run: printf '%s\n' "$RELEASE_TAG" > public-release-tag.txt
-      - name: Upload public release tag
-        uses: actions/upload-artifact@v4
-        with:
-          name: public-release-tag
-          path: public-release-tag.txt
-          if-no-files-found: error

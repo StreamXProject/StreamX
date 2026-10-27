@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0c0f0d" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f6f1" media="(prefers-color-scheme: light)">
+<meta name="description" content="StreamX is a music player for Android. Download the APK, plugins, skins and the optional Automix engine.">
+<title>StreamX — music player for Android</title>
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="alternate icon" href="assets/icon.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script>(()=>{const d=document.documentElement;d.classList.add('js');try{const t=localStorage.getItem('theme');if(t==='light'||t==='dark')d.dataset.theme=t}catch{}})()</script>
+<link rel="stylesheet" href="style.css">
+<script src="extensions.js" defer></script><script src="motion.js" defer></script><script src="tour.js" defer></script><script src="app.js" defer></script>
+</head>
+<body>
+<div class="backdrop" aria-hidden="true"><div class="blob blob-a"></div><div class="blob blob-b"></div><div class="blob blob-c"></div></div>
+<div class="progress" aria-hidden="true"></div>
+
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="./" aria-label="StreamX home"><img src="assets/icon.webp" width="34" height="34" alt="">StreamX</a>
+    <nav aria-label="Main">
+      <a href="#screens">Skins</a><a href="#plugins">Plugins</a><a href="#automix">Automix</a><a href="https://github.com/StreamXProject/StreamX/releases">Releases <span aria-hidden="true">↗</span></a><a href="https://github.com/StreamXProject/StreamX">Source <span aria-hidden="true">↗</span></a>
+    </nav>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch colour theme">
+      <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>
+      <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg>
+    </button>
+    <a class="nav-cta magnetic" href="#download-section">Download</a>
+  </div>
+</header>
+
+<main>
+<section class="hero wrap">
+  <div class="intro">
+    <div class="eyebrow reveal"><span class="live"><i></i></span> ANDROID 8.0+ · DIRECT APK</div>
+    <h1 class="headline" aria-label="Let your music move.">
+      <span class="line"><span>Let your</span></span>
+      <span class="line"><span>music <em>move.</em></span></span>
+    </h1>
+    <p class="lead reveal" style="--d:.35s">A music player for Android that plays from YouTube Music, JioSaavn, your own servers and plugins, trying each source in the order you choose.</p>
+    <div class="download reveal" style="--d:.45s">
+      <a class="button magnetic" id="download" href="https://github.com/StreamXProject/StreamX/releases/latest/download/StreamX-arm64-v8a.apk"><span class="button-label">Download APK</span><span class="button-icon" aria-hidden="true">↓</span></a>
+      <a class="quiet link-arrow" id="release-notes" href="https://github.com/StreamXProject/StreamX/releases">Release notes <span aria-hidden="true">↗</span></a>
+    </div>
+    <p class="fine reveal" style="--d:.55s" id="version" role="status">Android 8.0+ · ARM64</p>
+  </div>
+
+  <div class="hero-visual reveal" style="--d:.2s" aria-hidden="true">
+    <div class="halo"></div>
+    <div class="ring ring-a"></div><div class="ring ring-b"></div>
+    <div class="tilt" data-tilt>
+      <div class="phone phone-hero">
+        <div class="screen"><img src="assets/screens/home.webp" alt="" data-shot="Home" decoding="async"></div>
+      </div>
+      <div class="float-card float-now"><div class="eq"><i></i><i></i><i></i><i></i><i></i></div><b>Now playing</b></div>
+      <div class="float-card float-mix"><span class="mix-dot">≈</span><b>Automix on</b></div>
+    </div>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track" id="marquee">
+    <span>Spotify</span><i>✦</i><span>Apple Music</span><i>✦</i><span>Amazon Music</span><i>✦</i><span>CloudStream</span><i>✦</i><span>Skins</span><i>✦</i><span>Automix</span><i>✦</i>
+    <span>Spotify</span><i>✦</i><span>Apple Music</span><i>✦</i><span>Amazon Music</span><i>✦</i><span>CloudStream</span><i>✦</i><span>Skins</span><i>✦</i><span>Automix</span><i>✦</i>
+  </div>
+</div>
+
+<section class="wrap screens" id="screens" aria-labelledby="screens-heading">
+  <div class="section-head reveal">
+    <div class="eyebrow"><span class="dot"></span> SKINS</div>
+    <h2 id="screens-heading">One app, many looks.</h2>
+    <p>Pick a skin to see its home, player and library.</p>
+  </div>
+  <div class="showcase" id="showcase">
+    <div class="stack reveal" id="shot-panel" role="tabpanel" aria-live="polite">
+      <figure class="phone shot" data-shot-index="0" data-pos="0"><div class="screen"><img src="assets/screens/home.webp" alt="Home screen" data-shot="Home" decoding="async"></div></figure>
+      <figure class="phone shot" data-shot-index="1" data-pos="1"><div class="screen"><img src="assets/screens/player.webp" alt="Player" data-shot="Player" decoding="async"></div></figure>
+      <figure class="phone shot" data-shot-index="2" data-pos="2"><div class="screen"><img src="assets/screens/library.webp" alt="Library" data-shot="Library" decoding="async"></div></figure>
+    </div>
+    <div class="tour-panel reveal" style="--d:.1s">
+      <div class="skin-title">
+        <span class="skin-logo" id="skin-logo"><img src="assets/icon.webp" alt=""></span>
+        <div><small id="skin-kicker">DEFAULT</small><h3 id="skin-name">StreamX</h3></div>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Screen">
+        <button role="tab" aria-selected="true" aria-controls="shot-panel" data-shot-tab="0">Home</button>
+        <button role="tab" aria-selected="false" aria-controls="shot-panel" data-shot-tab="1">Player</button>
+        <button role="tab" aria-selected="false" aria-controls="shot-panel" data-shot-tab="2">Library</button>
+        <span class="tab-pill" aria-hidden="true"></span>
+      </div>
+      <div class="skin-picker" id="skin-picker" role="group" aria-label="Skin"></div>
+      <div class="tour-foot">
+        <a class="button button-sm magnetic" id="skin-get" href="#plugins" hidden><span class="button-label">Get this skin</span><span class="button-icon" aria-hidden="true">↓</span></a>
+        <button class="autoplay" id="autoplay" type="button" aria-pressed="true"><span class="ring-timer"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16"/></svg></span><span class="autoplay-label">Pause</span></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap releases" id="download-section" aria-labelledby="release-heading">
+  <div class="section-head reveal">
+    <div class="eyebrow"><span class="dot"></span> DOWNLOAD</div>
+    <h2 id="release-heading">Get StreamX.</h2>
+  </div>
+  <div class="cards" style="grid-template-columns:1fr">
+    <article class="card card-stable reveal spot">
+      <div class="card-top"><span class="badge">STABLE</span><span class="card-icon">↓</span></div>
+      <h3 id="stable-title">StreamX for Android</h3>
+      <p>Download the APK, open it on your phone and follow the install prompts.</p>
+      <div class="asset-links" id="stable-assets"><a href="https://github.com/StreamXProject/StreamX/releases/latest">View stable release ↗</a></div>
+      <p class="fine" id="stable-detail">Every release includes SHA-256 checksums.</p>
+    </article>
+  </div>
+</section>
+
+<section class="wrap extensions" id="plugins" aria-labelledby="plugins-heading">
+  <div class="section-head reveal">
+    <div class="eyebrow"><span class="dot"></span> EXTENSIONS</div>
+    <h2 id="plugins-heading">Plugins and skins.</h2>
+    <p>Add this link in StreamX under Settings → Sources to install and update them in the app, or download the APKs here.</p>
+  </div>
+  <div class="repository-link reveal">
+    <label for="repository-url">REPOSITORY LINK</label>
+    <div class="repo-row"><input id="repository-url" readonly value="https://streamxproject.github.io/StreamX-Releases/extensions/index.json"><button type="button" id="copy-repository" class="magnetic"><span>Copy link</span></button></div>
+    <span class="fine" id="copy-status" role="status" aria-live="polite"></span>
+  </div>
+  <h3 class="sub-head reveal">Plugins</h3>
+  <div id="public-plugins" class="public-plugins"><p class="fine">See <a href="https://github.com/StreamXProject/StreamX-Releases/releases">plugin releases ↗</a> for available APKs.</p></div>
+  <h3 class="sub-head reveal">Skins <span id="public-skin-count"></span></h3>
+  <div id="public-skins" class="skin-grid"><p class="fine">See <a href="https://github.com/StreamXProject/Skins/releases">skin releases ↗</a> for all skins.</p></div>
+</section>
+
+<section class="wrap" id="automix">
+  <div class="automix-panel reveal spot">
+    <div class="automix-copy">
+      <div class="eyebrow"><span class="dot"></span> OPTIONAL</div>
+      <h2>Automix.</h2>
+      <p>An engine and audio analysis models that line up beats and vocals for smoother transitions. Turn on Automix in Settings and StreamX offers the download.</p>
+      <a class="quiet link-arrow" id="automix-release" href="https://github.com/StreamXProject/StreamX-Releases/releases/tag/automix-1">Automix packages <span aria-hidden="true">↗</span></a>
+    </div>
+    <div class="automix-side">
+      <div class="crossfade" aria-hidden="true"><svg viewBox="0 0 400 90" preserveAspectRatio="none"><path class="wave-a" d="M0 45 Q 25 5 50 45 T 100 45 T 150 45 T 200 45 T 250 45 T 300 45 T 350 45 T 400 45"/><path class="wave-b" d="M0 45 Q 25 85 50 45 T 100 45 T 150 45 T 200 45 T 250 45 T 300 45 T 350 45 T 400 45"/></svg></div>
+      <div class="model-box">
+        <div class="model-heading"><span class="model-symbol">≈</span><div><h3>Automix package</h3><p id="model-version" role="status">Engine + beat and vocal models</p></div></div>
+        <div id="model-assets" class="model-assets"><p>Packages for ARM64, ARMv7 and x86_64 are on the release page.</p></div>
+        <p class="fine">Downloaded separately from the APK and verified by the app before installing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap install">
+  <div class="section-head reveal">
+    <div class="eyebrow"><span class="dot"></span> INSTALL</div>
+    <h2>Three steps.</h2>
+  </div>
+  <ol class="steps">
+    <li class="reveal"><span class="step-num">1</span><div><h3>Download the APK</h3><p>The main download is for ARM64. Other architectures are on the release page.</p></div></li>
+    <li class="reveal" style="--d:.1s"><span class="step-num">2</span><div><h3>Open it</h3><p>If Android asks, allow your browser or file manager to install apps.</p></div></li>
+    <li class="reveal" style="--d:.2s"><span class="step-num">3</span><div><h3>Add plugins and skins</h3><p>In StreamX, go to Settings → Sources and add the repository link above.</p></div></li>
+  </ol>
+</section>
+
+<noscript><p class="wrap">JavaScript is off. Use the download button or visit <a href="https://github.com/StreamXProject/StreamX/releases">GitHub Releases</a> for APKs and Automix packages.</p></noscript>
+</main>
+
+<footer class="wrap">
+  <a class="brand" href="./"><img src="assets/icon.webp" width="26" height="26" alt="">StreamX</a>
+  <p>Music player for Android.</p>
+  <a href="https://github.com/StreamXProject/StreamX">Source on GitHub ↗</a>
+</footer>
+</body>
+</html>

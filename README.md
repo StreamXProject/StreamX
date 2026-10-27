@@ -9,8 +9,8 @@ A music player for Android that plays from YouTube Music, JioSaavn, your own ser
 and plugins, trying each source in the order you choose.
 </p>
 
-[Download](https://github.com/StreamXProject/StreamX-Releases/releases/latest) ·
-[Website](https://streamxproject.github.io/StreamX-Releases/) ·
+[Download](https://github.com/StreamXProject/StreamX/releases/latest) ·
+[Website](https://streamxproject.github.io/StreamX/) ·
 [Skins](https://github.com/StreamXProject/Skins)
 
 </div>
@@ -27,7 +27,7 @@ and plugins, trying each source in the order you choose.
 
 ## Install
 
-Download `StreamX.apk` from the [latest release](https://github.com/StreamXProject/StreamX-Releases/releases/latest). Requires Android 8.0 or later.
+Download `StreamX-arm64-v8a.apk` from the [latest release](https://github.com/StreamXProject/StreamX/releases/latest). Requires Android 8.0 or later.
 
 ## Build
 

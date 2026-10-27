@@ -1,83 +1,25 @@
-name: Publish public downloads
-
+name: Mirror legacy Automix packages
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Published source release tag (v1.8 or automix-1)'
+        description: 'Automix package tag (automix-N)'
         required: true
         type: string
-  # Releases created by build.yml using GITHUB_TOKEN do not trigger release workflows.
-  workflow_run:
-    workflows: [Build StreamX]
-    types: [completed]
-    branches: [main]
-
 permissions:
   contents: read
-  actions: read
-
-concurrency:
-  group: streamx-public-downloads
-  cancel-in-progress: false
-
 jobs:
   publish:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'workflow_dispatch' &&
-       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
           persist-credentials: false
-      - name: Check publishing credential
+      - name: Mirror Automix package
         env:
-          PUBLIC_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
-        run: |
-          if [ -z "$PUBLIC_TOKEN" ]; then
-            echo '::error::Add PUBLIC_RELEASE_TOKEN: a fine-grained token with Contents read/write for StreamX-Releases only.'
-            exit 1
-          fi
-      - name: Download build release tag
-        if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
-        with:
-          name: public-release-tag
-          path: public-release
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
-      - name: Resolve release tag
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          EVENT_NAME: ${{ github.event_name }}
-          INPUT_TAG: ${{ inputs.tag }}
-          EVENT_TAG: ${{ github.event.release.tag_name }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
-        shell: python
-        run: |
-          import json, os, subprocess
-          tag = os.environ['INPUT_TAG'] or os.environ['EVENT_TAG']
-          if os.environ['EVENT_NAME'] == 'workflow_run':
-              from pathlib import Path
-              tag = Path('public-release/public-release-tag.txt').read_text().strip()
-          if not tag or '\n' in tag or '\r' in tag:
-              raise SystemExit('Invalid release tag')
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-              out.write(f'tag={tag}\n')
-      - name: Publish approved APKs or Automix packages
-        env:
-          SOURCE_REPO: ${{ github.repository }}
-          PUBLIC_REPO: StreamXProject/StreamX-Releases
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag }}
           GH_SOURCE_TOKEN: ${{ github.token }}
           GH_PUBLIC_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
-        run: python3 .github/scripts/publish-public.py
+        run: |
+          [[ "$RELEASE_TAG" =~ ^automix-[1-9][0-9]*$ ]] || exit 1
+          python3 .github/scripts/publish-public.py
