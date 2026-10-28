@@ -99,16 +99,13 @@ fun SourcesScreen(
             Text(stringResource(R.string.source),
                 style = MaterialTheme.typography.displayLarge,
                 color = MaterialTheme.colorScheme.onBackground)
-            Text(when (tab) {
-                    0 -> "Choose what fills Home and what plays it."
-                    1 -> "What your registries offer, and which of it StreamX plays from."
-                    else -> "Make StreamX yours. Apply a skin or customize each section."
-                },
+            Text(if (tab == 0) "Choose what fills Home and what plays it."
+                else "Make StreamX yours. Apply a skin or customize each section.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
             SegmentedControl(
-                options = listOf(stringResource(R.string.source), "Addons", stringResource(R.string.skins_title)),
+                options = listOf(stringResource(R.string.source), stringResource(R.string.skins_title)),
                 selectedIndex = tab, onSelect = { tab = it },
             )
             Spacer(Modifier.height(12.dp))
@@ -117,13 +114,10 @@ fun SourcesScreen(
     val tabs = rememberSaveableStateHolder()
     Box(modifier.fillMaxSize()) {
         tabs.SaveableStateProvider(tab) {
-            when (tab) {
-                0 -> SourcesContent(contentPadding, onEditSource, onOpenStreamXSetup,
-                    onEditWebDav, onEditSmb, onConfirmJioSaavn, header = header)
-                1 -> AddonsContent(contentPadding, header = header)
-                else -> SkinsPluginsScreen(onSources = { tab = 0 }, onDismiss = { tab = 0 },
-                    embeddedSkins = true, header = header, embeddedPadding = contentPadding)
-            }
+            if (tab == 0) SourcesContent(contentPadding, onEditSource, onOpenStreamXSetup,
+                onEditWebDav, onEditSmb, onConfirmJioSaavn, header = header)
+            else SkinsPluginsScreen(onSources = { tab = 0 }, onDismiss = { tab = 0 },
+                embeddedSkins = true, header = header, embeddedPadding = contentPadding)
         }
     }
 }
@@ -268,7 +262,7 @@ private fun SourcesContent(
         // Only installed extensions are shown in the playback order.
         val visibleConfigs = configs.filter {
             when(it.kind) {
-                // Extensions from a registry are catalogues, managed on the Addons tab.
+                // Extensions from a registry are catalogues, not playback sources.
                 SourceKind.APK_PLUGIN -> it.shownInSources && !com.music.streamx.data.extensions.SflxBridge.handles(it) &&
                     installedExtensions.any { extension->extension.packageName==it.extensionPackage }
                 SourceKind.CLOUDSTREAM -> cloudVersion!=null
