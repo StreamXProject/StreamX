@@ -50,3 +50,6 @@ AGENTS.md
 # Local upstream reference checkouts; the host builds from its own sources.
 /StreamX/
 /apple-music-downloader/
+
+# Reference checkout, not part of StreamX.
+/Mornye/

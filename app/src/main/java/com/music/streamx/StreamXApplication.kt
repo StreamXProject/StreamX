@@ -56,6 +56,7 @@ class StreamXApplication : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         LegacyRename.migrateEncrypted(this)
         LauncherIcon.restore(this)
+        com.music.streamx.data.sources.module.AddonCatalogue.init(this)
         com.music.streamx.data.extensions.ApkExtensions.init(this)
         // The player is drawn by the shared UI module; this is what it reads
         // underneath — settings, the Canvas decoder, outputs, the party.

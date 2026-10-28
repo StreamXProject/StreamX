@@ -45,6 +45,10 @@ class ModuleSource(
      */
     private val manager = ModuleManager()
 
+    /** The modules this source can search and stream with, for the Addons page. */
+    suspend fun playableModuleIds(): Set<String> =
+        manager.fetchIndex(config.baseUrl).getOrDefault(emptyList()).mapTo(mutableSetOf()) { it.id }
+
     // ── Health ────────────────────────────────────────────────────────────
 
     override suspend fun health(): SourceHealth = withContext(Dispatchers.IO) {
@@ -114,7 +118,7 @@ class ModuleSource(
             val modules = manager.fetchIndex(indexUrl).getOrElse { e ->
                 TrackLog.w(TAG, "${config.displayName}: index fetch failed — ${e.message}")
                 return@withContext emptyList()
-            }
+            }.filter { com.music.streamx.data.sources.module.AddonCatalogue.allows(it.id) }
 
             val perModule = coroutineScope {
                 val answers = arrayOfNulls<List<Song>>(modules.size)
