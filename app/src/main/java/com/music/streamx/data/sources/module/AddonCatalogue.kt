@@ -35,7 +35,24 @@ data class AddonEntry(
     val registry: String,
     /** Whether StreamX can search and stream with it. */
     val plays: Boolean,
-)
+    /** The `.sflx` package, for adding a catalogue extension; blank for plain modules. */
+    val packageUrl: String = "",
+    val sha256: String = "",
+) {
+    /** The registry's own id, without the `sflx-` prefix modules use. */
+    val extensionId: String get() = key.removePrefix("sflx-")
+
+    /** What StreamX can use it for, from the tags registries publish (as Mornye reads them). */
+    val capabilities: List<String> get() = buildList {
+        if ("homefeed" in tags) add("Feed")
+        if ("search" in tags || "metadata" in tags) add("Search")
+        if ("lyrics" in tags || category == "lyrics") add("Lyrics")
+        if (plays) add("Plays")
+    }
+
+    /** Whether it can be added as a catalogue: Home feed, search and pages. */
+    val catalogue: Boolean get() = packageUrl.isNotBlank() && ("homefeed" in tags || "search" in tags || "metadata" in tags)
+}
 
 /**
  * Everything the module indexes and SpotiFLAC registries the listener added
@@ -64,6 +81,17 @@ object AddonCatalogue {
         val next = if (enabled) _disabled.value - key else _disabled.value + key
         _disabled.value = next
         if (::prefs.isInitialized) prefs.edit().putStringSet(KEY_DISABLED, next).apply()
+    }
+
+    /** The catalogue source added for [entry], if it has been added. */
+    fun added(entry: AddonEntry): com.music.streamx.data.sources.SourceConfig? =
+        SourceRegistry.configs.value.firstOrNull { it.extensionPackage == com.music.streamx.data.extensions.SflxBridge.PREFIX + entry.extensionId }
+
+    /** Adds [entry] as a catalogue (Home feed, search, pages), or removes it. */
+    fun setCatalogue(entry: AddonEntry, on: Boolean) {
+        val existing = added(entry)
+        if (on && existing == null) SourceRegistry.add(com.music.streamx.data.extensions.SflxBridge.config(entry.extensionId, entry.name, entry.packageUrl, entry.sha256))
+        else if (!on && existing != null) SourceRegistry.remove(existing.id)
     }
 
     /** Every registry the listener added, read again. Failures leave that registry out. */
@@ -102,6 +130,8 @@ object AddonCatalogue {
                 author = text("author"),
                 registry = registry,
                 plays = key in playable,
+                packageUrl = text("download_url").takeIf { it.startsWith("https://") }.orEmpty(),
+                sha256 = text("sha256").lowercase(),
             )
         }.distinctBy { it.key }
     }

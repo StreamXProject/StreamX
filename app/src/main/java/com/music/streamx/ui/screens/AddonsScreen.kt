@@ -55,7 +55,7 @@ private fun categoryTitle(category: String) = when (category) {
  */
 @Composable
 internal fun AddonsContent(contentPadding: PaddingValues, header: @Composable () -> Unit) {
-    val configs by SourceRegistry.configs.collectAsStateWithLifecycle()
+    val configs by SourceRegistry.configs.collectAsStateWithLifecycle() // also redraws catalogue switches
     val disabled by AddonCatalogue.disabled.collectAsStateWithLifecycle()
     val registries = configs.filter { (it.kind == SourceKind.CUSTOM_MODULE || it.kind == SourceKind.MODULE) && it.baseUrl.isNotBlank() }
     var entries by remember { mutableStateOf<List<AddonEntry>?>(null) }
@@ -119,11 +119,18 @@ internal fun AddonsContent(contentPadding: PaddingValues, header: @Composable ()
                 SettingsGroup(
                     header = categoryTitle(c),
                     footer = if (c == "download") "Switched-on providers are searched when a source plays a track."
-                        else "Shown so you know what the registry offers. StreamX can't run these yet.",
+                        else "Switch one on to use it for Home and search. Pick it under Sources → Home; its tracks play through your playback order.",
                 ) {
                     group.forEachIndexed { index, entry ->
                         if (index > 0) RowDivider()
-                        val on = entry.key !in disabled
+                        // A provider StreamX streams from is switched as a source; a feed or
+                        // search extension is switched in as a catalogue for Home and search.
+                        val catalogueOn = entry.catalogue && AddonCatalogue.added(entry) != null
+                        val usable = entry.plays || entry.catalogue
+                        val on = if (entry.plays) entry.key !in disabled else catalogueOn
+                        val toggle: (Boolean) -> Unit = { value ->
+                            if (entry.plays) AddonCatalogue.setEnabled(entry.key, value) else AddonCatalogue.setCatalogue(entry, value)
+                        }
                         SettingsRow(
                             icon = if (entry.icon == null) Icons.Rounded.Extension else null,
                             iconPainter = entry.icon?.let { rememberAsyncImagePainter(it) },
@@ -133,12 +140,11 @@ internal fun AddonsContent(contentPadding: PaddingValues, header: @Composable ()
                                 entry.description.takeIf { it.isNotBlank() },
                                 entry.registry.takeIf { registries.size > 1 },
                             ).joinToString(" · ").ifBlank { null },
-                            badge = if (entry.plays) "Plays in StreamX" else "Not supported yet",
-                            enabled = entry.plays,
-                            onClick = if (entry.plays) ({ AddonCatalogue.setEnabled(entry.key, !on) }) else null,
-                            trailing = if (entry.plays) ({
-                                com.music.streamx.ui.components.SkinSwitch(checked = on,
-                                    onCheckedChange = { AddonCatalogue.setEnabled(entry.key, it) })
+                            badge = if (usable) entry.capabilities.joinToString(" · ").ifBlank { null } else "Not supported yet",
+                            enabled = usable,
+                            onClick = if (usable) ({ toggle(!on) }) else null,
+                            trailing = if (usable) ({
+                                com.music.streamx.ui.components.SkinSwitch(checked = on, onCheckedChange = toggle)
                             }) else null,
                         )
                     }

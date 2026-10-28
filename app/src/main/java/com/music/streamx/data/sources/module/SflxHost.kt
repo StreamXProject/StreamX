@@ -163,6 +163,15 @@ internal object SflxHost {
                 mac.init(SecretKeySpec(args[1].toString().toByteArray(), algorithm))
                 mac.doFinal(args[2].toString().toByteArray()).joinToString("") { "%02x".format(it) }
             })
+            // Byte-level HMAC for extensions that pass byte arrays (TOTP and the like): hex in, hex out.
+            function("hmacHex", sync { args ->
+                val algorithm = if (args[0].toString().lowercase() == "sha256") "HmacSHA256" else "HmacSHA1"
+                fun bytes(hex: String) = ByteArray(hex.length / 2) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+                val mac = Mac.getInstance(algorithm)
+                mac.init(SecretKeySpec(bytes(args[1].toString()).takeIf { it.isNotEmpty() } ?: ByteArray(1), algorithm))
+                mac.doFinal(bytes(args[2].toString())).joinToString("") { "%02x".format(it) }
+            })
+            function("timezone", sync { java.util.TimeZone.getDefault().id })
             function("base64Decode", sync { args ->
                 String(Base64.getDecoder().decode(args[0].toString()), Charsets.ISO_8859_1)
             })
@@ -196,7 +205,9 @@ internal object SflxHost {
                 builder.header("User-Agent", USER_AGENT)
             }
             val upper = method.uppercase()
-            val requestBody = (body ?: "").toRequestBody(
+            // Bytes, not a String: OkHttp appends "; charset=utf-8" to a String body's
+            // type, and some APIs (Spotify's client token) refuse anything but the exact value.
+            val requestBody = (body ?: "").toByteArray().toRequestBody(
                 (contentType ?: "application/json; charset=utf-8").toMediaTypeOrNull(),
             )
             when (upper) {
@@ -310,8 +321,20 @@ internal object SflxHost {
             md5: function(s) { return __sflx.digest('md5', String(s)); },
             sha1: function(s) { return __sflx.digest('sha1', String(s)); },
             sha256: function(s) { return __sflx.digest('sha256', String(s)); },
-            hmacSHA256: function(key, data) { return __sflx.hmac('sha256', String(key), String(data)); },
-            hmacSHA1: function(key, data) { return __sflx.hmac('sha1', String(key), String(data)); },
+            // Mornye's signatures: hmacSHA256(message, key) as hex, and
+            // hmacSHA1(key, message) over UTF-8 text or byte arrays, returning bytes.
+            hmacSHA256: function(message, key) { return __sflx.hmac('sha256', String(key), String(message)); },
+            hmacSHA1: function(key, message) {
+                function hex(v) {
+                    var b = typeof v === 'string' ? Array.from(unescape(encodeURIComponent(v)), function(c) { return c.charCodeAt(0); })
+                        : Array.isArray(v) ? v : [];
+                    return b.map(function(x) { return ((x & 255) + 256).toString(16).slice(1); }).join('');
+                }
+                var out = __sflx.hmacHex('sha1', hex(key), hex(message));
+                var bytes = [];
+                for (var i = 0; i < out.length; i += 2) bytes.push(parseInt(out.substr(i, 2), 16));
+                return bytes;
+            },
             base64Decode: function(s) { return __sflx.base64Decode(String(s)); },
             base64Encode: function(s) { return __sflx.base64Encode(String(s)); },
             sleep: function(ms) { __sflx.sleep(ms || 0); },
@@ -322,7 +345,8 @@ internal object SflxHost {
             getLocalTime: function() {
                 var d = new Date();
                 return { hour: d.getHours(), minute: d.getMinutes(), weekday: d.getDay(),
-                         timezone: '', offsetSeconds: -d.getTimezoneOffset() * 60 };
+                         timezone: __sflx.timezone(), offsetSeconds: -d.getTimezoneOffset() * 60,
+                         offsetMinutes: d.getTimezoneOffset() };
             },
             checkISRCExists: function() { return false; },
             getAudioQuality: function() { return null; },
@@ -408,6 +432,13 @@ internal object SflxHost {
             var ext = __sflx_ext;
             __sflx_init();
             return {
+                // Any function the extension registered, for catalogue use:
+                // feed, search, album, playlist and artist pages.
+                call: function(name, argsJson) {
+                    if (typeof ext[name] !== 'function') return { missing: true };
+                    var value = ext[name].apply(ext, JSON.parse(argsJson || '[]'));
+                    return Promise.resolve(value).then(function(v) { return { value: v === undefined ? null : v }; });
+                },
                 searchTracks: function(query, limit) {
                     limit = limit || 20;
                     var list = null;

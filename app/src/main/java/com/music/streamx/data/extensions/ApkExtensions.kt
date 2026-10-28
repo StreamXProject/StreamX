@@ -131,7 +131,7 @@ object ApkExtensions {
                 }.distinctBy { it.packageName }
                 installed.value = discovered
                 scanError.value = null
-                SourceRegistry.configs.value.filter { it.kind == SourceKind.APK_PLUGIN }.forEach { config ->
+                SourceRegistry.configs.value.filter { it.kind == SourceKind.APK_PLUGIN && !SflxBridge.handles(it) }.forEach { config ->
                     val current = discovered.firstOrNull { it.packageName == config.extensionPackage }
                     if (current == null || current.certificate != config.extensionCertificate || current.sourceAuthority != config.extensionAuthority) {
                         if (config.enabled) SourceRegistry.setEnabled(config.id, false)
@@ -290,6 +290,8 @@ object ApkExtensions {
     }
 
     suspend fun call(config: SourceConfig, method: String, extras: Bundle = Bundle()): String = withContext(Dispatchers.IO) {
+        // A SpotiFLAC extension answers the same protocol without an APK behind it.
+        if (SflxBridge.handles(config)) return@withContext SflxBridge.call(config, method, extras)
         check(config.extensionPackage.isNotBlank() && config.extensionAuthority.isNotBlank()) { "Extension has no provider" }
         check(certificate(config.extensionPackage) == config.extensionCertificate) { "Extension signing certificate changed. Re-enable the installed APK." }
         verifyProvider(config.extensionPackage, config.extensionAuthority)

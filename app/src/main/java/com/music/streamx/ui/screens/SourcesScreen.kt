@@ -268,7 +268,9 @@ private fun SourcesContent(
         // Only installed extensions are shown in the playback order.
         val visibleConfigs = configs.filter {
             when(it.kind) {
-                SourceKind.APK_PLUGIN -> it.shownInSources && installedExtensions.any { extension->extension.packageName==it.extensionPackage }
+                // Extensions from a registry are catalogues, managed on the Addons tab.
+                SourceKind.APK_PLUGIN -> it.shownInSources && !com.music.streamx.data.extensions.SflxBridge.handles(it) &&
+                    installedExtensions.any { extension->extension.packageName==it.extensionPackage }
                 SourceKind.CLOUDSTREAM -> cloudVersion!=null
                 else -> true
             }

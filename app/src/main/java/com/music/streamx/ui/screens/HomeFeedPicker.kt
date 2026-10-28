@@ -44,7 +44,8 @@ internal fun HomeFeedPicker(
             SourceKind.STREAMX, SourceKind.YOUTUBE -> true
             SourceKind.CLOUDSTREAM -> cloudStreamInstalled
             SourceKind.APK_PLUGIN -> SourceRegistry.feedEligible(config) &&
-                installedExtensions.any { it.packageName == config.extensionPackage && it.sourceAuthority != null }
+                (com.music.streamx.data.extensions.SflxBridge.handles(config) ||
+                    installedExtensions.any { it.packageName == config.extensionPackage && it.sourceAuthority != null })
             else -> false
         }
     }.distinctBy { if (it.kind == SourceKind.APK_PLUGIN) it.id else it.kind.name }
