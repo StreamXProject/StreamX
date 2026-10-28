@@ -97,14 +97,16 @@ class WebSessionPlayer(
                 val routed = song.toMediaItem().buildUpon().setMediaMetadata(item.mediaMetadata).build()
                 browser.stop()
                 selected = null; reportedError = null; reportedState = null
-                wanted = shouldPlay
+                // A play pressed while the extension was starting may not have reached
+                // [shouldPlay] yet; dropping it left the track paused until resume.
+                wanted = shouldPlay || wanted
                 wrappedPlayer.replaceMediaItem(index, routed)
                 wrappedPlayer.seekTo(index, position)
                 wrappedPlayer.prepare()
                 // Browser playback owns play/pause once the queue transition
                 // selects the matched plugin item.
-                if (browser.target(routed) != null) browser.load(routed, shouldPlay)
-                else wrappedPlayer.playWhenReady = shouldPlay
+                if (browser.target(routed) != null) browser.load(routed, wanted)
+                else wrappedPlayer.playWhenReady = wanted
                 true
             }
         }
@@ -122,11 +124,13 @@ class WebSessionPlayer(
                     .setCustomCacheKey(null).build()
                 browser.stop()
                 selected = null; reportedError = null; reportedState = null
-                wanted = shouldPlay
+                // A play pressed while the extension was starting may not have reached
+                // [shouldPlay] yet; dropping it left the track paused until resume.
+                wanted = shouldPlay || wanted
                 wrappedPlayer.replaceMediaItem(index, routed)
                 wrappedPlayer.seekTo(index, position)
                 wrappedPlayer.prepare()
-                wrappedPlayer.playWhenReady = shouldPlay
+                wrappedPlayer.playWhenReady = wanted
                 true
             }
         }
@@ -138,7 +142,9 @@ class WebSessionPlayer(
                     val index = wrappedPlayer.currentMediaItemIndex
                     val position = wrappedPlayer.currentPosition.coerceAtLeast(0L)
                     browser.stop(); selected = null; reportedError = null; reportedState = null
-                    wanted = shouldPlay
+                    // A play pressed while the extension was starting may not have reached
+                    // [shouldPlay] yet; dropping it left the track paused until resume.
+                    wanted = shouldPlay || wanted
                     val sourceId = com.music.streamx.data.sources.SourceRegistry.parseTrackKey(item.mediaId)?.first
                     if (sourceId != null) NativeExtensionRouting.update(sourceId, true)
                     // Mark the whole remaining queue, not just its first track. Read-ahead
@@ -147,7 +153,7 @@ class WebSessionPlayer(
                         NativeExtensionRouting.decorate(wrappedPlayer.getMediaItemAt(at))
                     }
                     wrappedPlayer.replaceMediaItems(index, wrappedPlayer.mediaItemCount, remaining)
-                    wrappedPlayer.seekTo(index,position); wrappedPlayer.prepare(); wrappedPlayer.playWhenReady = shouldPlay
+                    wrappedPlayer.seekTo(index,position); wrappedPlayer.prepare(); wrappedPlayer.playWhenReady = wanted
                     true
                 }
             }
@@ -165,12 +171,14 @@ class WebSessionPlayer(
                     val position = wrappedPlayer.currentPosition.coerceAtLeast(0L)
                     browser.stop()
                     selected = null; reportedError = null; reportedState = null
-                    wanted = shouldPlay
+                    // A play pressed while the extension was starting may not have reached
+                    // [shouldPlay] yet; dropping it left the track paused until resume.
+                    wanted = shouldPlay || wanted
                     wrappedPlayer.replaceMediaItem(index, fallback)
                     wrappedPlayer.seekTo(index, position)
                     com.music.streamx.data.TrackLog.d("WebPlayback", "YouTube handoff at ${position}ms", about = item.mediaId)
                     wrappedPlayer.prepare()
-                    wrappedPlayer.playWhenReady = shouldPlay
+                    wrappedPlayer.playWhenReady = wanted
                     true
                 }
             }
