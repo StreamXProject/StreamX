@@ -97,9 +97,9 @@ class WebSessionPlayer(
                 val routed = song.toMediaItem().buildUpon().setMediaMetadata(item.mediaMetadata).build()
                 browser.stop()
                 selected = null; reportedError = null; reportedState = null
-                // A play pressed while the extension was starting may not have reached
-                // [shouldPlay] yet; dropping it left the track paused until resume.
-                wanted = shouldPlay || wanted
+                // A play pressed while the extension was starting can land on the local
+                // player instead of [shouldPlay]; dropping it left the track paused until resume.
+                wanted = shouldPlay || wanted || wrappedPlayer.playWhenReady
                 wrappedPlayer.replaceMediaItem(index, routed)
                 wrappedPlayer.seekTo(index, position)
                 wrappedPlayer.prepare()
@@ -124,9 +124,9 @@ class WebSessionPlayer(
                     .setCustomCacheKey(null).build()
                 browser.stop()
                 selected = null; reportedError = null; reportedState = null
-                // A play pressed while the extension was starting may not have reached
-                // [shouldPlay] yet; dropping it left the track paused until resume.
-                wanted = shouldPlay || wanted
+                // A play pressed while the extension was starting can land on the local
+                // player instead of [shouldPlay]; dropping it left the track paused until resume.
+                wanted = shouldPlay || wanted || wrappedPlayer.playWhenReady
                 wrappedPlayer.replaceMediaItem(index, routed)
                 wrappedPlayer.seekTo(index, position)
                 wrappedPlayer.prepare()
@@ -142,9 +142,9 @@ class WebSessionPlayer(
                     val index = wrappedPlayer.currentMediaItemIndex
                     val position = wrappedPlayer.currentPosition.coerceAtLeast(0L)
                     browser.stop(); selected = null; reportedError = null; reportedState = null
-                    // A play pressed while the extension was starting may not have reached
-                    // [shouldPlay] yet; dropping it left the track paused until resume.
-                    wanted = shouldPlay || wanted
+                    // A play pressed while the extension was starting can land on the local
+                    // player instead of [shouldPlay]; dropping it left the track paused until resume.
+                    wanted = shouldPlay || wanted || wrappedPlayer.playWhenReady
                     val sourceId = com.music.streamx.data.sources.SourceRegistry.parseTrackKey(item.mediaId)?.first
                     if (sourceId != null) NativeExtensionRouting.update(sourceId, true)
                     // Mark the whole remaining queue, not just its first track. Read-ahead
@@ -171,9 +171,9 @@ class WebSessionPlayer(
                     val position = wrappedPlayer.currentPosition.coerceAtLeast(0L)
                     browser.stop()
                     selected = null; reportedError = null; reportedState = null
-                    // A play pressed while the extension was starting may not have reached
-                    // [shouldPlay] yet; dropping it left the track paused until resume.
-                    wanted = shouldPlay || wanted
+                    // A play pressed while the extension was starting can land on the local
+                    // player instead of [shouldPlay]; dropping it left the track paused until resume.
+                    wanted = shouldPlay || wanted || wrappedPlayer.playWhenReady
                     wrappedPlayer.replaceMediaItem(index, fallback)
                     wrappedPlayer.seekTo(index, position)
                     com.music.streamx.data.TrackLog.d("WebPlayback", "YouTube handoff at ${position}ms", about = item.mediaId)
@@ -234,7 +234,9 @@ class WebSessionPlayer(
     override fun setMediaItems(items: List<MediaItem>) { setMediaItems(items, true) }
     override fun prepare() { sync(); if (!browser.active) super.prepare() }
     override fun play() { wanted = true; sync(); if (browser.active) browser.play() else super.play() }
-    override fun pause() { wanted = false; if (browser.active) browser.pause() else super.pause() }
+    // The local player is paused too while the extension plays, so its own flag
+    // stays a true record of the listener's intent for a later handoff.
+    override fun pause() { wanted = false; if (browser.active) { browser.pause(); wrappedPlayer.playWhenReady = false } else super.pause() }
     override fun setPlayWhenReady(play: Boolean) { if (play) play() else pause() }
     override fun stop() {
         wanted = false
