@@ -266,6 +266,10 @@ class ModuleManager {
             SflxHost.unpack(bytes)
         }
 
+    /** A SpotiFLAC package's manifest, from the same cache streaming uses; null when it cannot be read. */
+    suspend fun sflxManifest(module: SpineModule): org.json.JSONObject? =
+        withContext(Dispatchers.IO) { runCatching { sflxPackage(module).manifest }.getOrNull() }
+
     /**
      * The registry entries this host can actually stream from.
      *

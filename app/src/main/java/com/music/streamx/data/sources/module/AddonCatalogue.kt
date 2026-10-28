@@ -7,6 +7,8 @@ import com.music.streamx.data.sources.ModuleSource
 import com.music.streamx.data.sources.SourceKind
 import com.music.streamx.data.sources.SourceRegistry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,7 +44,7 @@ data class AddonEntry(
     /** The registry's own id, without the `sflx-` prefix modules use. */
     val extensionId: String get() = key.removePrefix("sflx-")
 
-    /** What StreamX can use it for, from the tags registries publish (as Mornye reads them). */
+    /** What StreamX can use it for, from the tags registries publish. */
     val capabilities: List<String> get() = buildList {
         if ("homefeed" in tags) add("Feed")
         if ("search" in tags || "metadata" in tags) add("Search")
@@ -114,7 +116,8 @@ object AddonCatalogue {
                     it.icon ?: it.logo, it.author, registry, it.id in playable)
             }
         }
-        return (obj["extensions"] as JsonArray).mapNotNull { element ->
+        val source = SourceRegistry.instance(configId) as? ModuleSource
+        val listed = (obj["extensions"] as JsonArray).mapNotNull { element ->
             val entry = element as? JsonObject ?: return@mapNotNull null
             fun text(key: String) = entry[key]?.jsonPrimitive?.contentOrNull.orEmpty()
             if (text("id").isBlank()) return@mapNotNull null
@@ -123,7 +126,7 @@ object AddonCatalogue {
                 key = key,
                 name = text("display_name").ifBlank { text("name") }.ifBlank { text("id") },
                 version = text("version"),
-                description = text("description"),
+                description = text("description").replace(Regex("\\s+for Mornye\\b", RegexOption.IGNORE_CASE), ""),
                 category = text("category").ifBlank { "utility" },
                 tags = (entry["tags"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
                 icon = text("icon_url").ifBlank { null },
@@ -134,6 +137,22 @@ object AddonCatalogue {
                 sha256 = text("sha256").lowercase(),
             )
         }.distinctBy { it.key }
+        // Extensions that only run behind their own app's signed gateway can never
+        // work here, so they are left out rather than listed as unsupported.
+        return coroutineScope {
+            listed.map { entry ->
+                async {
+                    val manifest = entry.packageUrl.takeIf { it.isNotBlank() }?.let {
+                        source?.manifestOf(SpineModule(id = entry.key, name = entry.name, type = SFLX_TYPE, download = it, sha256 = entry.sha256))
+                    }
+                    val features = manifest?.optJSONArray("requiredRuntimeFeatures")
+                    val gated = (0 until (features?.length() ?: 0)).any {
+                        features!!.optString(it).let { f -> f.startsWith("signedSession") || f.startsWith("sessionGrant") }
+                    }
+                    entry.takeUnless { gated || manifest?.has("signedSession") == true }
+                }
+            }.map { it.await() }.filterNotNull()
+        }
     }
 
     private const val KEY_DISABLED = "disabled"

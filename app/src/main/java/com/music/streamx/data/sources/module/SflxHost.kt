@@ -321,7 +321,7 @@ internal object SflxHost {
             md5: function(s) { return __sflx.digest('md5', String(s)); },
             sha1: function(s) { return __sflx.digest('sha1', String(s)); },
             sha256: function(s) { return __sflx.digest('sha256', String(s)); },
-            // Mornye's signatures: hmacSHA256(message, key) as hex, and
+            // SpotiFLAC's signatures: hmacSHA256(message, key) as hex, and
             // hmacSHA1(key, message) over UTF-8 text or byte arrays, returning bytes.
             hmacSHA256: function(message, key) { return __sflx.hmac('sha256', String(key), String(message)); },
             hmacSHA1: function(key, message) {

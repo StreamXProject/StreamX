@@ -45,6 +45,10 @@ class ModuleSource(
      */
     private val manager = ModuleManager()
 
+    /** [module]'s manifest, read through this source's package cache. */
+    suspend fun manifestOf(module: com.music.streamx.data.sources.module.SpineModule): org.json.JSONObject? =
+        manager.sflxManifest(module)
+
     /** The modules this source can search and stream with, for the Addons page. */
     suspend fun playableModuleIds(): Set<String> =
         manager.fetchIndex(config.baseUrl).getOrDefault(emptyList()).mapTo(mutableSetOf()) { it.id }
