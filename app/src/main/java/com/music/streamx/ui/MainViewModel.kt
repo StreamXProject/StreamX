@@ -1648,6 +1648,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
+            // The all-sources playlists switch reloads Library with or without them.
+            AppSettings.multiSourcePlaylists.drop(1).collect { if (_library.value !is UiState.Loading) refresh(Feed.LIBRARY) }
+        }
+        viewModelScope.launch {
             // Turning an extra Home feed on or off reloads Home with its section.
             combine(SourceRegistry.extraFeedIds, SourceRegistry.multiFeed) { ids, on -> ids to on }.drop(1).collect {
                 if (_home.value !is UiState.Loading) refresh(Feed.HOME)
@@ -1874,7 +1878,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             when (feed) {
                 Feed.HOME -> refreshHome(identity)
                 Feed.EXPLORE -> fetchExplore()
-                Feed.LIBRARY -> fetchLibrary(identity)
+                Feed.LIBRARY -> { fetchLibrary(identity); appendSourcePlaylists(identity) }
             }
             _refreshing.value = _refreshing.value - feed
         }
@@ -2224,7 +2228,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!_signedIn.value && !usingExtension) return
         val identity = listenerKey()
         _library.value = UiState.Loading
-        viewModelScope.launch { fetchLibrary(identity) }
+        viewModelScope.launch { fetchLibrary(identity); appendSourcePlaylists(identity) }
+    }
+
+    /**
+     * With [AppSettings.multiSourcePlaylists] on, a "Playlists" section for each
+     * other connected plugin, after the library of whichever one leads Home.
+     * A plugin that is signed out or fails is left out; the rest still show.
+     */
+    private suspend fun appendSourcePlaylists(identity: String?) = coroutineScope {
+        if (!AppSettings.multiSourcePlaylists.value) return@coroutineScope
+        val installed = com.music.streamx.data.extensions.ApkExtensions.installed.value
+        val plugins = SourceRegistry.configs.value.filter { config ->
+            SourceRegistry.feedEligible(config) && config.id != SourceRegistry.selectedExtensionId.value &&
+                !com.music.streamx.data.extensions.SflxBridge.handles(config) &&
+                installed.any { it.packageName == config.extensionPackage && it.sourceAuthority != null }
+        }
+        if (plugins.isEmpty()) return@coroutineScope
+        val shelves = plugins.map { config ->
+            async {
+                val playlists = try { com.music.streamx.data.extensions.ApkCatalogue(config).playlists() }
+                    catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (_: Exception) { emptyList() }
+                playlists.takeIf { it.isNotEmpty() }?.let { rows ->
+                    HomeShelf("Playlists", rows.map { ShelfItem(it.title, it.subtitle, it.thumbnailUrl, null, it.browseId) },
+                        subtitle = "From ${config.displayName}")
+                }
+            }
+        }.awaitAll().filterNotNull()
+        if (shelves.isEmpty() || identity != listenerKey()) return@coroutineScope
+        val page = (_library.value as? UiState.Success)?.data ?: LibraryPage(emptyList(), emptyList(), emptyList())
+        _library.value = UiState.Success(page.copy(shelves = page.shelves + shelves))
     }
 
     private suspend fun fetchLibrary(identity: String?) {

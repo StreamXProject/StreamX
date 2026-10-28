@@ -25,7 +25,10 @@ class ApkCatalogue(private val config: SourceConfig, private val metadataOnly: B
         } else if (metadataOnly) check(method in setOf("account", "detail", "saved")) { "This connection is read-only" }
         // In the playback walk, or the Home feed: a feed may come from a plugin
         // the user does not play through. Playback itself stays gated on enabled.
-        else check(SourceRegistry.config(config.id)?.let { it.enabled || SourceRegistry.servesFeed(it) } == true) { "Extension is disabled" }
+        else check(SourceRegistry.config(config.id)?.let { it.enabled || SourceRegistry.servesFeed(it) ||
+            // Playlists shown in Library from every connected plugin open and list here.
+            com.music.streamx.data.settings.AppSettings.multiSourcePlaylists.value && method in setOf("playlists", "detail", "saved") &&
+                SourceRegistry.feedEligible(it) } == true) { "Extension is disabled" }
         val response = JSONObject(ApkExtensions.call(config, method, extra))
         check(!response.has("error") || response.isNull("error")) { response.optString("error", "Extension request failed") }
         return response

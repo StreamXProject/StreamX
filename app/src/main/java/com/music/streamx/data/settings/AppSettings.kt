@@ -368,6 +368,9 @@ object AppSettings {
     /** Put the playing track's codec, bitrate and sample rate on the player. */
     val showNerdStats = MutableStateFlow(false)
 
+    /** Library also lists the playlists of every connected plugin, not only the one leading Home. */
+    val multiSourcePlaylists = MutableStateFlow(false)
+
     /** Freezes the main player's mesh gradient instead of letting it drift/crossfade. */
     val reduceAnimation = MutableStateFlow(false)
 
@@ -874,6 +877,7 @@ object AppSettings {
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
         showNerdStats.value = prefs.getBoolean(KEY_NERD_STATS, false)
+        multiSourcePlaylists.value = prefs.getBoolean(KEY_MULTI_SOURCE_PLAYLISTS, false)
         reduceAnimation.value = prefs.getBoolean(KEY_REDUCE_ANIMATION, false)
         // Importing upstream welcome pages must not block an already configured
         // StreamX install behind a new account/name flow.
@@ -1232,6 +1236,11 @@ object AppSettings {
     fun setPlaybackSpeed(value: Float) {
         playbackSpeed.value = value
         prefs.edit().putFloat(KEY_SPEED, value).apply()
+    }
+
+    fun setMultiSourcePlaylists(value: Boolean) {
+        multiSourcePlaylists.value = value
+        prefs.edit().putBoolean(KEY_MULTI_SOURCE_PLAYLISTS, value).apply()
     }
 
     fun setShowNerdStats(value: Boolean) {
@@ -2055,6 +2064,7 @@ object AppSettings {
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
     private const val KEY_REPEAT_MODE = "repeat_mode"
     private const val KEY_NERD_STATS = "show_nerd_stats"
+    private const val KEY_MULTI_SOURCE_PLAYLISTS = "multi_source_playlists"
     private const val KEY_CACHE_LIMIT = "audio_cache_limit_bytes"
     private const val KEY_REDUCE_ANIMATION = "reduce_animation"
     private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"

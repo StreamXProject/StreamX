@@ -258,6 +258,18 @@ private fun SourcesContent(
             onOpenStreamXSetup = onOpenStreamXSetup,
             onOpenCloudStream = { cloudSettings = true },
         )
+        val multiSourcePlaylists by AppSettings.multiSourcePlaylists.collectAsStateWithLifecycle()
+        SettingsGroup(footer = "Library lists your playlists from every connected plugin, each in its own section, not only from the one that leads Home.") {
+            SettingsRow(
+                title = "Playlists from all sources",
+                subtitle = if (multiSourcePlaylists) "Spotify, Apple Music, Amazon and other plugins" else "Only from the source leading Home",
+                trailing = {
+                    com.music.streamx.ui.components.SkinSwitch(checked = multiSourcePlaylists,
+                        onCheckedChange = AppSettings::setMultiSourcePlaylists)
+                },
+                onClick = { AppSettings.setMultiSourcePlaylists(!multiSourcePlaylists) },
+            )
+        }
 
         // Only installed extensions are shown in the playback order.
         val visibleConfigs = configs.filter {
