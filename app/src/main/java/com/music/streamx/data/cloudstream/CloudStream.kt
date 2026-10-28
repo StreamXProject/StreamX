@@ -29,6 +29,8 @@ data class CloudStreamConfig(
     val botToken: String = "", val apiId: String = "", val apiHash: String = "",
     val mongoUri: String = "", val database: String = "", val collection: String = "", val enabled: Boolean = false,
     val profileId: String = "", val libraryCollection: String = "streamx_app_library", val accountName: String = "", val accountPhoto: String = "",
+    /** Telegram file parts fetched at once ahead of playback; see the engine's read-ahead. */
+    val streamThreads: Int = 4,
 ) {
     fun validate() {
         require(botToken.matches(Regex("[0-9]+:[A-Za-z0-9_-]+"))) { "Enter a valid Telegram bot token" }
@@ -40,6 +42,7 @@ data class CloudStreamConfig(
     fun bundle() = Bundle().apply {
         putString("bot_token", botToken); putInt("api_id", apiId.toIntOrNull() ?: 0); putString("api_hash", apiHash)
         putString("mongo_uri", mongoUri); putString("database", database); putString("collection", collection); putString("profile_id", profileId); putString("library_collection", libraryCollection)
+        putInt("stream_threads", streamThreads)
     }
     override fun toString() = "CloudStreamConfig(enabled=$enabled, credentials=redacted)"
 }
@@ -80,11 +83,12 @@ object CloudStream {
         if (!::context.isInitialized || context.getSharedPreferences("cloudstream_credentials", Context.MODE_PRIVATE).all.isEmpty()) return CloudStreamConfig()
         val j = JSONObject(prefs.getString(key(endpoint), "{}") ?: "{}")
         return CloudStreamConfig(j.optString("bot_token"), j.optString("api_id"), j.optString("api_hash"),
-            j.optString("mongo_uri"), j.optString("database"), j.optString("collection"), j.optBoolean("enabled"), j.optString("profile_id"), j.optString("library_collection", "streamx_app_library"), j.optString("account_name"), j.optString("account_photo"))
+            j.optString("mongo_uri"), j.optString("database"), j.optString("collection"), j.optBoolean("enabled"), j.optString("profile_id"), j.optString("library_collection", "streamx_app_library"), j.optString("account_name"), j.optString("account_photo"),
+            j.optInt("stream_threads", 4).coerceIn(1, 8))
     }
     fun save(endpoint: String, value: CloudStreamConfig) {
         val j = JSONObject().put("bot_token",value.botToken).put("api_id",value.apiId).put("api_hash",value.apiHash)
-            .put("mongo_uri",value.mongoUri).put("database",value.database).put("collection",value.collection).put("enabled",value.enabled).put("profile_id", value.profileId).put("library_collection", value.libraryCollection).put("account_name",value.accountName).put("account_photo",value.accountPhoto)
+            .put("mongo_uri",value.mongoUri).put("database",value.database).put("collection",value.collection).put("enabled",value.enabled).put("profile_id", value.profileId).put("library_collection", value.libraryCollection).put("account_name",value.accountName).put("account_photo",value.accountPhoto).put("stream_threads",value.streamThreads)
         check(prefs.edit().putString(key(endpoint),j.toString()).commit()) { "Could not store CloudStream settings" }
         if (endpoint == PROFILE) revision.value += 1
         if (!value.enabled && installed()) io.launch { runCatching { context.contentResolver.call(uri,"close",null,null) } }

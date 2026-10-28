@@ -58,6 +58,16 @@ internal fun CloudStreamSettings(endpoint: String = CloudStream.PROFILE) {
         RowDivider()
         SettingsRow(title = "Connection activity", subtitle = "Connections, streaming and errors", onClick = { terminal = true })
         RowDivider()
+        // More parts in flight start a track sooner and survive slow Telegram
+        // servers better, at the cost of data used ahead of where you are.
+        SettingsRow(title = "Streaming threads", subtitle = "Parts of a track fetched at once. More is faster on a good connection.",
+            value = config.streamThreads.toString(), enabled = config.enabled, onClick = {
+                val next = when (config.streamThreads) { 1 -> 2; 2 -> 4; 4 -> 8; else -> 1 }
+                runCatching { CloudStream.save(endpoint, config.copy(streamThreads = next)) }
+                    .onSuccess { config = config.copy(streamThreads = next); error = null }
+                    .onFailure { error = "Could not update encrypted CloudStream settings" }
+            })
+        RowDivider()
         SettingsRow(title = "Sync library", subtitle = syncStatus, onClick = { scope.launch { com.music.streamx.data.cloudstream.CloudLibrary.sync() } })
     }
     error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp)) }
