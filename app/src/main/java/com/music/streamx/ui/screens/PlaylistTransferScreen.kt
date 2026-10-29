@@ -128,7 +128,7 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
                     if((ui.sourceProvider=="youtube" || ui.destinationProvider=="youtube") &&
                         (message.contains("Connect YouTube Music",true) || message.contains("YouTube",true) && message.contains("sign in",true))) TextButton(onClick=onSignIn,enabled=!ui.busy){Text("Connect YouTube Music")}
                     for(provider in listOfNotNull(source,destination).distinctBy{it.id}.filter{it.id.startsWith("plugin:") &&
-                        (message.contains("authorization",true) || message.contains("sign in",true) || message.contains("connect ${it.name}",true))}) {
+                        (message.contains("authorization",true) || message.contains("sign in",true) || message.contains("open the extension",true) || message.contains("connect ${it.name}",true))}) {
                         val config=configs.firstOrNull{it.id==provider.id.removePrefix("plugin:")}
                         val extension=installed.firstOrNull{it.packageName==(provider.pluginPackage ?: config?.extensionPackage)}
                         if(extension!=null) TextButton(onClick={ApkExtensions.showSettings(extension)},enabled=!ui.busy){Text("Manage ${provider.name} account")}
