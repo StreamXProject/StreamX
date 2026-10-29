@@ -30,6 +30,17 @@ class PlaylistTransferRecordsTest {
             listOf(unresolved.copy(excluded=true),unresolved.copy(candidates=emptyList())))
         assertEquals(listOf(record),decodeTransferRecords(encodeTransferRecords(listOf(record))))
     }
+    @Test fun recordsKeepSongsAlreadyThere() {
+        val record=TransferRecord("record","Mix","Route",1234L,listOf(unresolved),listOf(song("had") to "Favourites"))
+        assertEquals(listOf(record),decodeTransferRecords(encodeTransferRecords(listOf(record))))
+    }
+    @Test fun everyRowHasAnOutcome() {
+        assertEquals(RecordOutcome.NOT_ADDED,outcomeOf(unresolved))
+        assertEquals(RecordOutcome.PICKED,outcomeOf(unresolved.copy(selectedId="first")))
+        assertEquals(RecordOutcome.ADDED,outcomeOf(unresolved.copy(selectedId="first",uncertain=false)))
+        assertEquals(RecordOutcome.NOT_FOUND,outcomeOf(unresolved.copy(candidates=emptyList())))
+        assertEquals(RecordOutcome.SKIPPED,outcomeOf(unresolved.copy(excluded=true)))
+    }
     @Test fun invalidRecordStorageDoesNotInventSelections() {
         assertTrue(decodeTransferRecords("broken").isEmpty())
     }

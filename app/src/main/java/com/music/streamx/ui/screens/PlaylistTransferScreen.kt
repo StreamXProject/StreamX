@@ -99,7 +99,7 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
         page==TransferSubPage.Check -> "Playlists to check"
         resultItem!=null -> resultItem.playlist.title
         record!=null -> record.title
-        profilesOpen -> "Sync Profiles"
+        profilesOpen -> "Sync and records"
         reviewing -> "Review changes"
         running -> if(ui.busy)"Transferring" else "Transfer complete"
         step==TransferStepPage.PLAYLISTS -> "Choose playlists"
@@ -161,6 +161,9 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
                     SettingsGroup {
                         SettingsRow(icon=Icons.Rounded.Sync,title="Sync profiles",subtitle="Playlists kept up to date automatically",
                             value=ui.links.size.takeIf{it>0}?.toString(),enabled=!ui.busy,onClick={profilesOpen=true})
+                        RowDivider()
+                        SettingsRow(icon=Icons.Rounded.History,title="Transfer records",subtitle="Every song of your past transfers",
+                            value=ui.records.size.takeIf{it>0}?.toString(),enabled=!ui.busy,onClick={profilesOpen=true})
                     }
                 }
                 step==TransferStepPage.PLAYLISTS -> playlistsPage(ui,coordinator,source)
@@ -174,7 +177,7 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
                     closePicks.isEmpty() -> "Pick songs to add" to null
                     else -> "Add ${closePicks.size} ${if(closePicks.size==1)"song" else "songs"}" to {coordinator.addCloseMatches(resultItem.playlist.playlistId,closePicks)}
                 }
-                record!=null -> "Mark reviewed" to {coordinator.markRecordReviewed(record.id);page=null}
+                record!=null -> if(record.rows.any{it.uncertain && it.selectedId!=null && !it.excluded}) "Mark reviewed" to {coordinator.markRecordReviewed(record.id);page=null} else "Done" to {page=null}
                 page!=null -> null
                 profilesOpen -> null
                 reviewing -> (if(ui.busy)ui.progress.ifBlank{"Working…"} else "Save reviewed changes") to coordinator::apply.takeIf{!ui.busy}
@@ -466,11 +469,14 @@ private fun LazyListScope.profilesPage(ui: PlaylistTransferUi,coordinator: Playl
         }
     }
     if(ui.records.isNotEmpty()) item {
-        SettingsGroup(header="Transfer records",footer="Close matches and Brute picks are kept here for later review. The latest 20 are saved on this device.") {
+        SettingsGroup(header="Transfer records",footer="Every transfer, with each song and what became of it. The latest 20 are kept on this device.") {
             ui.records.forEachIndexed { index,record ->
                 if(index>0) RowDivider()
-                val pending=record.rows.count{it.uncertain && it.selectedId!=null && !it.excluded}
-                SettingsRow(icon=Icons.Rounded.History,title=record.title,subtitle="${record.route} · $pending to review",onClick={onRecord(record.id)})
+                val added=record.rows.count{it.selectedId!=null && !it.excluded}
+                val missed=record.rows.count{it.selectedId==null && !it.excluded}
+                SettingsRow(icon=Icons.Rounded.History,title=record.title,
+                    subtitle=listOfNotNull(record.route,"$added added",record.known.size.takeIf{it>0}?.let{"$it already there"},missed.takeIf{it>0}?.let{"$it not added"}).joinToString(" · "),
+                    onClick={onRecord(record.id)})
             }
         }
     }
@@ -588,45 +594,51 @@ private fun LazyListScope.resultPage(item: BatchTransfer,destination: TransferPr
     }
 }
 
-/** A saved record of picked matches, with the alternatives that were passed over. */
+/** A saved transfer: every song in it, grouped by what became of it. */
 private fun LazyListScope.recordPage(record: TransferRecord) {
+    val groups=record.rows.groupBy(::outcomeOf)
     item(key="record-header") {
-        Text("${record.route} · ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.createdAt))}",
-            Modifier.padding(horizontal=20.dp).padding(top=10.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("Reviewing this record doesn't change the destination playlist.",
-            Modifier.padding(horizontal=20.dp).padding(top=4.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    itemsIndexed(record.rows,key={index,row->"$index:${row.source.videoId}"}) { _,row ->
         val c=MaterialTheme.colorScheme
-        val selected=row.candidates.firstOrNull{it.videoId==row.selectedId}
-        Column(Modifier.padding(horizontal=16.dp).padding(top=10.dp)) { TransferCard {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                ServiceTile("playlist",row.source.thumbnailUrl)
-                Column(Modifier.weight(1f).padding(start=12.dp)) {
-                    Text(row.source.title,style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.SemiBold),maxLines=2,overflow=TextOverflow.Ellipsis)
-                    Text(row.source.artist,style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
-                }
-                if(row.uncertain && selected!=null && !row.excluded) Icon(Icons.Rounded.Info,"Needs review",Modifier.size(20.dp),tint=Color(0xFFCB8830))
+        Text("${record.route} · ${java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM,java.text.DateFormat.SHORT).format(java.util.Date(record.createdAt))}",
+            Modifier.padding(horizontal=20.dp).padding(top=10.dp),style=MaterialTheme.typography.bodyMedium,color=c.onSurfaceVariant)
+        Column(Modifier.padding(horizontal=16.dp).padding(top=14.dp)) { TransferCard {
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                TransferCount(groups[RecordOutcome.ADDED].orEmpty().size+groups[RecordOutcome.PICKED].orEmpty().size,"Added",Modifier.weight(1f),Color(0xFF32BE63))
+                TransferCount(record.known.size,"Already there",Modifier.weight(1f),c.onSurfaceVariant)
+                TransferCount(groups[RecordOutcome.NOT_FOUND].orEmpty().size+groups[RecordOutcome.NOT_ADDED].orEmpty().size,"Not added",Modifier.weight(1f),Color(0xFFCB8830))
             }
-            Text(when {
-                row.excluded -> "Skipped"
-                selected==null -> "No selection"
-                else -> "Added: ${selected.title} · ${selected.artist}${selected.durationText?.let{" · $it"}.orEmpty()}"
-            },style=MaterialTheme.typography.bodyMedium)
-            row.candidates.filter{it.videoId!=row.selectedId}.takeIf{it.isNotEmpty()}?.let { others ->
-                Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                    Text("Other versions",style=MaterialTheme.typography.labelMedium,color=c.onSurfaceVariant)
-                    others.forEach{Text("${it.title} · ${it.artist}${it.durationText?.let{d->" · $d"}.orEmpty()}",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)}
-                }
-            }
+            Text("Reviewing this record doesn't change the destination playlist.",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
         } }
     }
+    fun section(outcome: RecordOutcome,title: String,detail: String) {
+        val rows=groups[outcome].orEmpty()
+        if(rows.isEmpty()) return
+        item(key="h:$outcome") {TransferSection("$title · ${rows.size}",detail)}
+        items(rows,key={"$outcome:"+it.source.videoId}) { row ->
+            val picked=row.candidates.firstOrNull{it.videoId==row.selectedId}
+            val others=row.candidates.filter{it.videoId!=row.selectedId}
+            TransferSongRow(row.source.title,when {
+                picked!=null && (outcome==RecordOutcome.PICKED || picked.title!=row.source.title) -> "${row.source.artist} → ${picked.title} · ${picked.artist}"
+                outcome==RecordOutcome.NOT_ADDED && others.isNotEmpty() -> "${row.source.artist} · closest: ${others.first().title} · ${others.first().artist}"
+                else -> row.source.artist
+            },row.source.thumbnailUrl)
+        }
+    }
+    section(RecordOutcome.PICKED,"Close matches added","A similar version was added. Check these if a song sounds different.")
+    section(RecordOutcome.NOT_ADDED,"Close matches not added","Only a similar version was found, and it wasn't added.")
+    section(RecordOutcome.NOT_FOUND,"Not found","Nothing similar turned up on the destination.")
+    section(RecordOutcome.SKIPPED,"Skipped","Left out by you.")
+    if(record.known.isNotEmpty()) {
+        item(key="h:known") {TransferSection("Already in your playlists · ${record.known.size}","Left out so they weren't copied twice.")}
+        items(record.known,key={"known:"+it.first.videoId}) { (song,playlist) -> TransferSongRow(song.title,"${song.artist} · In $playlist",song.thumbnailUrl) }
+    }
+    section(RecordOutcome.ADDED,"Added","")
 }
 
 @Composable private fun TransferSection(title: String,detail: String) {
     Column(Modifier.padding(horizontal=20.dp).padding(top=26.dp,bottom=2.dp)) {
         Text(title,style=MaterialTheme.typography.titleMedium.copy(fontWeight=FontWeight.Bold))
-        Text(detail,Modifier.padding(top=2.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        if(detail.isNotBlank()) Text(detail,Modifier.padding(top=2.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

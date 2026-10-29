@@ -353,9 +353,9 @@ internal class PlaylistTransferCoordinator(context: Context,private val scope: C
                 saveLinks()
             }
             // Keep the chosen release and its alternatives even for a one-off transfer.
-            if(ui.brute || ui.matches.any{it.uncertain && it.selectedId!=null}) {
+            run {
                 val record=TransferRecord(java.util.UUID.randomUUID().toString(),prepared.title,
-                    "${source.name} → ${destination.name}",System.currentTimeMillis(),ui.matches)
+                    "${source.name} → ${destination.name}",System.currentTimeMillis(),ui.matches.map(::recordRow),prepared.known)
                 records=(listOf(record)+records).take(20)
                 saveRecords()
             }
@@ -401,6 +401,8 @@ internal class PlaylistTransferCoordinator(context: Context,private val scope: C
         }
     }
     private val batchPlans=mutableMapOf<String,PlaylistTransferPlan>()
+    /** The record kept for each playlist of the current batch, so picking close matches later updates it. */
+    private val recordOf=mutableMapOf<String,String>()
     private fun updateBatch(id: String,change: (BatchTransfer)->BatchTransfer) {
         _state.value=_state.value.copy(batch=_state.value.batch.map{if(it.playlist.playlistId==id)change(it) else it})
     }
@@ -422,6 +424,7 @@ internal class PlaylistTransferCoordinator(context: Context,private val scope: C
         if(sharedTitle!=null && sharedTitle.isBlank()) return
         val seen=HashSet<String>()
         batchPlans.clear()
+        recordOf.clear()
         _state.value=ui.copy(batch=playlists.map{BatchTransfer(it)},stage=SyncStage.COMPLETE,progress="Transferring to ${destination.name}…")
         work {
             val existing=if(ui.skipExisting) existingTracks(destination,ui) else null
@@ -455,6 +458,12 @@ internal class PlaylistTransferCoordinator(context: Context,private val scope: C
                         saveLinks()
                     }
                     updateBatch(id){it.copy(status=BatchStatus.DONE,done=it.total,added=result?.added ?: 0,alreadyPresent=result?.alreadyPresent ?: 0,warning=result?.warning.orEmpty())}
+                    // Every song of every transfer, whatever became of it.
+                    val record=TransferRecord(java.util.UUID.randomUUID().toString(),playlist.title,"${source.name} → ${destination.name}",
+                        System.currentTimeMillis(),rows.map(::recordRow),prepared.known)
+                    recordOf[id]=record.id
+                    records=(listOf(record)+records).take(20)
+                    saveRecords()
                     if(result!=null) onChanged()
                 } catch(cancelled: CancellationException) { throw cancelled }
                 catch(failure: Exception) { updateBatch(id){it.copy(status=BatchStatus.FAILED,error=failure.message ?: "Could not transfer playlist")} }
@@ -481,7 +490,10 @@ internal class PlaylistTransferCoordinator(context: Context,private val scope: C
                 applyPlaylistTransfer(source,destination,plan.copy(rows=rows),onCreated={created->batchPlans[id]=plan.copy(destinationPlaylist=created)},progress={_,_->})
             }
             batchPlans[id]=plan.copy(destinationPlaylist=result.playlistId)
-            records=(listOf(TransferRecord(java.util.UUID.randomUUID().toString(),plan.title,"${source.name} → ${destination.name}",System.currentTimeMillis(),rows))+records).take(20)
+            val picked=rows.associateBy{it.source.videoId}
+            val existing=recordOf[id]?.let{rid->records.firstOrNull{it.id==rid}}
+            records=if(existing!=null) records.map{if(it.id==existing.id) it.copy(rows=it.rows.map{row->picked[row.source.videoId] ?: row}) else it}
+                else (listOf(TransferRecord(java.util.UUID.randomUUID().toString(),plan.title,"${source.name} → ${destination.name}",System.currentTimeMillis(),rows))+records).take(20)
             saveRecords()
             updateBatch(id){it.copy(added=it.added+result.added,alreadyPresent=it.alreadyPresent+result.alreadyPresent,close=emptyList())}
             onChanged()

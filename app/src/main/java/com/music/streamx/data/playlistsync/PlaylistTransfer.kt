@@ -61,12 +61,8 @@ internal suspend fun preparePlaylistTransfer(source: PlaylistTransferBackend,des
     val permits=Semaphore(3);val done=AtomicInteger()
     val matches=songs.map { song -> async {
         permits.withPermit {
-            val candidates=if(destination.ownsTrack(song.videoId)) listOf(song) else {
-                val query=TrackMatcher.queries(TrackMatcher.targetOf(song)).firstOrNull()
-                if(query==null) emptyList() else destination.search(query).filter { destination.ownsTrack(it.videoId) }
-            }
             val row=if(destination.ownsTrack(song.videoId)) SyncMatch(song,listOf(song),song.videoId,false)
-                else reviewPlaylistMatch(song,candidates)
+                else matchOnDestination(destination,song)
             progress(done.incrementAndGet(),songs.size)
             row
         }
@@ -112,4 +108,24 @@ internal suspend fun applyPlaylistTransfer(source: PlaylistTransferBackend,desti
     }
     guardTransferAccounts(source,destination,plan.sourceIdentity,plan.destinationIdentity)
     return PlaylistTransferResult(target.id,added,ids.size-additions.size,target.warning)
+}
+
+/**
+ * Searches [destination] for [song], one query after another until one finds
+ * it: "title artist" first, then the title alone for catalogues that credit
+ * someone else. When nothing passes the strict match, the rows that miss only
+ * on an explicit flag, a runtime or a release one catalogue states and the
+ * other doesn't are offered as close matches to review, not reported as
+ * missing.
+ */
+internal suspend fun matchOnDestination(destination: PlaylistTransferBackend,song: com.music.streamx.data.model.Song): SyncMatch {
+    val seen=LinkedHashMap<String,com.music.streamx.data.model.Song>()
+    for(query in TrackMatcher.queries(TrackMatcher.targetOf(song))) {
+        destination.search(query).filter{destination.ownsTrack(it.videoId)}.forEach{seen.putIfAbsent(it.videoId,it)}
+        val row=reviewPlaylistMatch(song,seen.values.toList())
+        if(row.candidates.isNotEmpty()) return row
+    }
+    val loose=song.copy(isExplicit=null,durationText=null,albumName=null)
+    val close=TrackMatcher.ranked(seen.values.toList(),TrackMatcher.targetOf(loose)).take(5)
+    return SyncMatch(song,close,null,close.isNotEmpty())
 }
