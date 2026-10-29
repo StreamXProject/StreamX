@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
@@ -150,12 +151,11 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
                         val providers=ui.providers
                         providers.forEachIndexed { index,provider ->
                             if(index>0) RowDivider()
-                            SettingsRow(icon=serviceIcon(provider.name),title=provider.name,
-                                value=if(provider.id==ui.sourceProvider && ui.selectedSources.isNotEmpty()) "${ui.selectedSources.size} selected" else null,
+                            ProviderRow(provider,value=if(provider.id==ui.sourceProvider && ui.selectedSources.isNotEmpty()) "${ui.selectedSources.size} selected" else null,
                                 enabled=!ui.busy,onClick={
                                     if(provider.id!=ui.sourceProvider || ui.sourcePlaylists.isEmpty()) coordinator.source(provider.id)
                                     step=TransferStepPage.PLAYLISTS
-                                })
+                                }) {Icon(Icons.Rounded.ChevronRight,null,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.6f))}
                         }
                     }
                     SettingsGroup {
@@ -217,11 +217,37 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
     }
 }
 
-private fun serviceIcon(name: String)=when {
-    name.contains("youtube",true) -> Icons.Rounded.SmartDisplay
-    name.contains("local",true) -> Icons.Rounded.PhoneAndroid
-    name.contains("cloud",true) -> Icons.Rounded.Cloud
-    else -> Icons.Rounded.LibraryMusic
+/** A provider's mark: the plugin's own app icon, or a tile for the services built into StreamX. */
+@Composable private fun ProviderLogo(provider: TransferProvider?,size: androidx.compose.ui.unit.Dp) {
+    val shape=RoundedCornerShape(size*.27f)
+    val plugin=provider?.pluginPackage?.takeIf{it.isNotBlank()}
+    if(plugin!=null) ExtensionLogo(plugin,modifier=Modifier.size(size).clip(shape))
+    else {
+        val name=provider?.name.orEmpty()
+        val youtube=name.contains("youtube",true)
+        val c=MaterialTheme.colorScheme
+        Box(Modifier.size(size).clip(shape).background(if(youtube)Color(0xFFFF172A) else c.surfaceContainerHighest),contentAlignment=Alignment.Center) {
+            Icon(when {
+                youtube -> Icons.Rounded.PlayArrow
+                name.contains("local",true) -> Icons.Rounded.PhoneAndroid
+                name.contains("cloud",true) -> Icons.Rounded.Cloud
+                name.contains("streamx",true) -> Icons.Rounded.Dns
+                else -> Icons.Rounded.LibraryMusic
+            },null,Modifier.size(size*.56f),tint=if(youtube)Color.White else c.onSurfaceVariant)
+        }
+    }
+}
+
+/** A provider in the From and To lists, shown with its real icon. */
+@Composable private fun ProviderRow(provider: TransferProvider,value: String?=null,enabled: Boolean,onClick: ()->Unit,trailing: @Composable ()->Unit) {
+    Row(Modifier.fillMaxWidth().clickable(enabled=enabled,onClick=onClick).alpha(if(enabled)1f else .45f)
+        .heightIn(min=60.dp).padding(horizontal=ROW_INSET,vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
+        ProviderLogo(provider,36.dp)
+        Spacer(Modifier.width(14.dp))
+        Text(provider.name,Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onBackground,maxLines=1,overflow=TextOverflow.Ellipsis)
+        value?.let{Text(it,Modifier.padding(horizontal=8.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        trailing()
+    }
 }
 
 @Composable private fun SelectMark(selected: Boolean) {
@@ -276,7 +302,7 @@ private fun LazyListScope.destinationPage(ui: PlaylistTransferUi,coordinator: Pl
         SettingsGroup(header="Music service",footer=if(targets.isEmpty())"Install a plugin or connect YouTube Music to transfer playlists." else null,topSpacing=14.dp) {
             targets.forEachIndexed { index,provider ->
                 if(index>0) RowDivider()
-                SettingsRow(icon=serviceIcon(provider.name),title=provider.name,enabled=!ui.busy,onClick={coordinator.destinationProvider(provider.id)}) {
+                ProviderRow(provider,enabled=!ui.busy,onClick={coordinator.destinationProvider(provider.id)}) {
                     SelectMark(provider.id==ui.destinationProvider)
                 }
             }
@@ -631,7 +657,7 @@ private fun LazyListScope.recordPage(record: TransferRecord) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
             @Composable fun End(label: String,provider: TransferProvider?,modifier: Modifier) {
                 Row(modifier,verticalAlignment=Alignment.CenterVertically) {
-                    ServiceTile(provider?.name ?: "")
+                    ProviderLogo(provider,42.dp)
                     Column(Modifier.padding(start=10.dp)) {
                         Text(label,style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
                         Text(provider?.name ?: "Choose",style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.SemiBold),maxLines=1,overflow=TextOverflow.Ellipsis)
