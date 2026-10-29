@@ -36,6 +36,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.Animation
+import androidx.compose.material.icons.rounded.Science
+import androidx.compose.material.icons.rounded.Insights
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BlurOff
@@ -290,6 +295,8 @@ fun SettingsScreen(
     // Filters the rows below — see [SettingsSearch]. Blank shows everything,
     // exactly as if the field weren't there.
     var searchQuery by remember { mutableStateOf("") }
+    /** The section open as its own page, by group key; null is the main list. */
+    var page by rememberSaveable { mutableStateOf<String?>(null) }
     var picking by remember { mutableStateOf<QualityTarget?>(null) }
     var pickingDownloadQuality by remember { mutableStateOf(false) }
     var pickingAutomixPerformance by remember { mutableStateOf(false) }
@@ -389,12 +396,21 @@ fun SettingsScreen(
     // Made fresh on every pass rather than remembered: it tallies the rows
     // that answered to the query, and that tally has to start from zero each
     // time the query changes.
-    val search = SettingsSearch(searchQuery)
+    // Sections open as their own pages, as BitChord's do, unless a skin draws its
+    // own settings page (some of those already split it into categories by key)
+    // or a search is running, which looks through every section at once.
+    val paged = com.music.streamx.ui.skins.LocalSkinRenderer.current !is com.music.streamx.ui.skins.SkinSettingsPageProvider &&
+        searchQuery.isBlank()
+    val openPage = page.takeIf { paged }
+    val search = SettingsSearch(searchQuery, paged, openPage)
+    androidx.activity.compose.BackHandler(enabled = openPage != null) { page = null }
+    val back: () -> Unit = { if (openPage != null) page = null else onBack() }
 
     // What is left after a keystroke is a different list, and the offset the
     // last one was scrolled to means nothing in it.
     val scrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
     var isFirstSearchComposition by remember { mutableStateOf(true) }
+    LaunchedEffect(openPage) { if (!isFirstSearchComposition) scrollState.scrollTo(0) }
     LaunchedEffect(searchQuery) {
         if (isFirstSearchComposition && searchQuery.isEmpty()) {
             // Skip the initial composition during Activity recreation:
@@ -406,7 +422,8 @@ fun SettingsScreen(
         }
     }
 
-    SettingsPresentation(modifier, contentPadding, scrollState, searchQuery, {searchQuery=it}, onBack) {
+    val pageTitle = openPage?.let { settingsSectionTitle(it) }
+    SettingsPresentation(modifier, contentPadding, scrollState, searchQuery, {searchQuery=it}, back, pageTitle) {
         SearchableSettingsGroup(search, key = "account") {
             val accountTitle = stringResource(R.string.account_integrations)
             // What the row opens is the scrobbling screen, so the services it
@@ -519,6 +536,15 @@ fun SettingsScreen(
         // does this minute cost"; these answer "what am I keeping, and when may
         // it be fetched" — and those two questions only make sense read
         // together, which is what puts them side by side here.
+        if (paged && openPage == null) {
+            SettingsGroup {
+                SETTINGS_SECTIONS.forEachIndexed { index, (key, icon) ->
+                    if (index > 0) RowDivider()
+                    SettingsRow(icon = icon, title = settingsSectionTitle(key), onClick = { page = key })
+                }
+            }
+        }
+
         SearchableSettingsGroup(search, header = stringResource(R.string.downloads), key = "downloads") {
             val downloadQualityTitle = stringResource(R.string.download_quality)
             row(downloadQualityTitle, "offline", "lossless") {
@@ -1546,7 +1572,7 @@ fun SettingsScreen(
 
         // The version line is the page's colophon, not a setting: it belongs to
         // the whole list, so it goes when the list is narrowed to a few rows.
-        if (searchQuery.isBlank()) {
+        if (searchQuery.isBlank() && openPage == null) {
         Text(
             text = buildAnnotatedString {
                 append("StreamX $version  ")
@@ -2374,7 +2400,10 @@ internal val TEXT_INSET = ROW_INSET + ICON_SIZE + ICON_GAP
  * every group has had its turn, which is why this is made fresh on each pass
  * rather than remembered.
  */
-private class SettingsSearch(query: String) {
+private class SettingsSearch(query: String, val paged: Boolean = false, val page: String? = null) {
+    /** Whether the group [key] is on the screen: its own page, or the main list for the groups that stay there. */
+    fun shows(key: String?): Boolean = !paged || if (page == null) key == null || key in ROOT_GROUPS else key == page
+
     // Trimmed, because a trailing space is a typo rather than a search for
     // something ending in one — and on a phone keyboard it is one keystroke
     // away from every word typed.
@@ -2436,11 +2465,14 @@ private fun SearchableSettingsGroup(
     topSpacing: Dp = 26.dp,
     content: @Composable SettingsGroupScope.() -> Unit,
 ) {
+    if (!search.shows(key)) return
     val scope = SettingsGroupScope(search, header)
     scope.content()
     if (scope.entries.isEmpty()) return
+    // On its own page the section's name is the page title, not a header above it.
+    val ownPage = search.paged && search.page != null
     androidx.compose.runtime.CompositionLocalProvider(com.music.streamx.ui.skins.LocalSkinSettingsGroupKey provides key) {
-    SettingsGroup(header = header, footer = footer, topSpacing = topSpacing) {
+    SettingsGroup(header = header.takeUnless { ownPage }, footer = footer, topSpacing = if (ownPage) 14.dp else topSpacing) {
         scope.entries.forEachIndexed { index, entry ->
             when {
                 index > 0 && entry.divided -> RowDivider()
@@ -2894,12 +2926,47 @@ internal fun SegmentedControl(
 
 
 @Composable
-private fun SettingsPresentation(modifier: Modifier,padding: PaddingValues,scroll: ScrollState,query: String,onQuery: (String)->Unit,onBack: ()->Unit,content: @Composable ()->Unit) {
+private fun SettingsPresentation(modifier: Modifier,padding: PaddingValues,scroll: ScrollState,query: String,onQuery: (String)->Unit,onBack: ()->Unit,
+    /** A section's own page is titled with its name and has no search field; null is the main list. */
+    pageTitle: String? = null,content: @Composable ()->Unit) {
     val skin=com.music.streamx.ui.skins.LocalSkinRenderer.current as? com.music.streamx.ui.skins.SkinSettingsPageProvider
     if(skin!=null) { androidx.compose.foundation.layout.Box(modifier) {skin.SettingsPage(query,onQuery,padding,onBack,content)};return }
     Column(modifier.fillMaxWidth().verticalScroll(scroll).padding(padding)) {
-        Text(stringResource(R.string.settings),style=MaterialTheme.typography.displayLarge,color=MaterialTheme.colorScheme.onBackground,modifier=Modifier.padding(start=20.dp,end=20.dp,top=8.dp,bottom=14.dp))
-        SearchField(query=query,onQueryChange=onQuery,onSubmit={},placeholder=stringResource(R.string.settings_search_hint),modifier=Modifier.padding(start=20.dp,end=20.dp,bottom=4.dp))
+        Text(pageTitle ?: stringResource(R.string.settings),style=MaterialTheme.typography.displayLarge,color=MaterialTheme.colorScheme.onBackground,modifier=Modifier.padding(start=20.dp,end=20.dp,top=8.dp,bottom=14.dp))
+        if(pageTitle==null) SearchField(query=query,onQueryChange=onQuery,onSubmit={},placeholder=stringResource(R.string.settings_search_hint),modifier=Modifier.padding(start=20.dp,end=20.dp,bottom=4.dp))
         content()
     }
 }
+
+/** Groups that stay on the main settings list; every other one is a page of its own. */
+private val ROOT_GROUPS = setOf("account", "audio_quality")
+
+/** The pages the main list opens, in its order, by group key. */
+private val SETTINGS_SECTIONS = listOf(
+    "downloads" to Icons.Rounded.Download,
+    "playback" to Icons.Rounded.PlayCircle,
+    "appearance" to Icons.Rounded.Palette,
+    "performance" to Icons.Rounded.Speed,
+    "library" to Icons.Rounded.LibraryMusic,
+    "local_music" to Icons.Rounded.Folder,
+    "storage" to Icons.Rounded.Storage,
+    "your_data" to Icons.Rounded.Insights,
+    "miscellaneous" to Icons.Rounded.Tune,
+    "language" to Icons.Rounded.Language,
+    "advanced_options" to Icons.Rounded.Science,
+)
+
+@Composable
+private fun settingsSectionTitle(key: String): String = stringResource(when (key) {
+    "downloads" -> R.string.downloads
+    "playback" -> R.string.playback
+    "appearance" -> R.string.appearance
+    "performance" -> R.string.performance
+    "library" -> R.string.library
+    "local_music" -> R.string.local_music
+    "storage" -> R.string.storage
+    "your_data" -> R.string.your_data
+    "miscellaneous" -> R.string.miscellaneous
+    "language" -> R.string.language
+    else -> R.string.advanced_options
+})
