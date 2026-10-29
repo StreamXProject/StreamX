@@ -1,6 +1,5 @@
 package com.music.streamx.ui.screens
 
-import com.music.streamx.ui.components.SkinAlertDialog as AlertDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +41,14 @@ import com.music.streamx.ui.components.topBarContentPadding
 /** Where the new transfer flow is: Soundiiz-style steps, one decision per page. */
 private enum class TransferStepPage { SOURCE, PLAYLISTS, DESTINATION }
 
+/** A page opened over the current step: choices and results that used to be popups. */
+private sealed interface TransferSubPage {
+    data object AddTo : TransferSubPage
+    data object Check : TransferSubPage
+    data class Result(val id: String) : TransferSubPage
+    data class Record(val id: String) : TransferSubPage
+}
+
 @Composable
 internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy: PlaylistSyncCoordinator,
     onSignIn: ()->Unit,onDismiss: ()->Unit) {
@@ -48,11 +56,11 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
     val installed by ApkExtensions.installed.collectAsStateWithLifecycle()
     val configs by SourceRegistry.configs.collectAsStateWithLifecycle()
     var step by rememberSaveable { mutableStateOf(TransferStepPage.SOURCE) }
-    var destinationPicker by remember { mutableStateOf(false) }
+    var page by remember { mutableStateOf<TransferSubPage?>(null) }
     var legacyOpen by remember { mutableStateOf(false) }
     var profilesOpen by remember { mutableStateOf(false) }
-    var recordId by remember { mutableStateOf<String?>(null) }
-    var detailId by remember { mutableStateOf<String?>(null) }
+    /** The candidate picked for each close match on the result page, by source song. */
+    var closePicks by remember { mutableStateOf<Map<String,String>>(emptyMap()) }
     val transferList=rememberLazyListState()
     val profilesList=rememberLazyListState()
     val running=ui.batch.isNotEmpty()
@@ -60,7 +68,7 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
     val keyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focus=androidx.compose.ui.platform.LocalFocusManager.current
     LaunchedEffect(Unit) {focus.clearFocus();keyboard?.hide()}
-    LaunchedEffect(ui.stage,step,running) { transferList.scrollToItem(0) }
+    LaunchedEffect(ui.stage,step,running,page) { transferList.scrollToItem(0) }
     // A playlist opened from its own page arrives already chosen.
     LaunchedEffect(ui.busy) { if(!ui.busy && !running && step==TransferStepPage.SOURCE && ui.selectedSources.isNotEmpty()) step=TransferStepPage.DESTINATION }
     val list=if(profilesOpen)profilesList else transferList
@@ -72,6 +80,7 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
     }
     val reviewing=ui.stage==SyncStage.REVIEW
     val back: ()->Unit={ when {
+        page!=null -> page=null
         profilesOpen -> profilesOpen=false
         reviewing && !ui.busy -> coordinator.configure()
         !running && step==TransferStepPage.DESTINATION && !ui.busy -> step=TransferStepPage.PLAYLISTS
@@ -81,22 +90,20 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
     BackHandler(onBack=back)
     val source=ui.providers.firstOrNull{it.id==ui.sourceProvider}
     val destination=ui.providers.firstOrNull{it.id==ui.destinationProvider}
-    if(destinationPicker) TransferDestinationDialog(ui,onNew={combine->destinationPicker=false;coordinator.combine(combine)},
-        onPick={destinationPicker=false;coordinator.destination(it)},onDismiss={destinationPicker=false})
-    ui.batch.firstOrNull{it.playlist.playlistId==detailId}?.let { item ->
-        TransferResultDialog(item,ui.busy,onAddClose={coordinator.addCloseMatches(item.playlist.playlistId)},onDismiss={detailId=null})
-    }
     val c=MaterialTheme.colorScheme
+    val resultItem=(page as? TransferSubPage.Result)?.let{p->ui.batch.firstOrNull{it.playlist.playlistId==p.id}}
+    val record=(page as? TransferSubPage.Record)?.let{p->ui.records.firstOrNull{it.id==p.id}}
     val header=when {
+        page==TransferSubPage.AddTo -> "Add to"
+        page==TransferSubPage.Check -> "Playlists to check"
+        resultItem!=null -> resultItem.playlist.title
+        record!=null -> record.title
         profilesOpen -> "Sync Profiles"
         reviewing -> "Review changes"
         running -> if(ui.busy)"Transferring" else "Transfer complete"
         step==TransferStepPage.PLAYLISTS -> "Choose playlists"
         step==TransferStepPage.DESTINATION -> "Transfer to"
         else -> "Playlist transfer"
-    }
-    ui.records.firstOrNull{it.id==recordId}?.let { record ->
-        TransferRecordDialog(record,onDismiss={recordId=null},onReviewed={coordinator.markRecordReviewed(record.id);recordId=null})
     }
     Box(Modifier.fillMaxSize().background(c.background).navigationBarsPadding()) {
         // Like Sources, content occupies the whole viewport beneath floating chrome.
@@ -105,10 +112,10 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
             item(key="screen-title") {
                 Column(Modifier.padding(horizontal=20.dp).padding(top=8.dp)) {
                     Text(header,style=MaterialTheme.typography.displayLarge,color=c.onBackground)
-                    if(!profilesOpen && !reviewing && !running) TransferStepDots(step.ordinal)
+                    if(page==null && !profilesOpen && !reviewing && !running) TransferStepDots(step.ordinal)
                 }
             }
-            if(ui.busy && !running) item {
+            if(ui.busy && !running && page==null) item {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)
                     Text(ui.progress.ifBlank{"Loading playlists…"},Modifier.weight(1f),textAlign=TextAlign.Start,color=c.onSurfaceVariant)
@@ -128,9 +135,16 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
                 } }
             } }
             when {
-                profilesOpen -> profilesPage(ui,coordinator,legacy,onReview={profilesOpen=false;coordinator.reviewLink(it)},onRecord={recordId=it},onLegacy={legacy.open();legacyOpen=true})
+                page==TransferSubPage.AddTo -> addToPage(ui,coordinator,destination)
+                page==TransferSubPage.Check -> checkPage(ui,coordinator,destination)
+                resultItem!=null -> resultPage(resultItem,destination,closePicks) {song,pick->closePicks=if(pick==null)closePicks-song else closePicks+(song to pick)}
+                record!=null -> recordPage(record)
+                page!=null -> {}
+                profilesOpen -> profilesPage(ui,coordinator,legacy,onReview={profilesOpen=false;coordinator.reviewLink(it)},onRecord={page=TransferSubPage.Record(it)},onLegacy={legacy.open();legacyOpen=true})
                 reviewing -> reviewPage(ui,coordinator,source,destination)
-                running -> progressPage(ui,destination,onDetail={detailId=it})
+                running -> progressPage(ui,source,destination,onDetail={id->
+                    closePicks=ui.batch.firstOrNull{it.playlist.playlistId==id}?.close.orEmpty().associate{it.source.videoId to it.candidates.first().videoId}
+                    page=TransferSubPage.Result(id)})
                 step==TransferStepPage.SOURCE -> item(key="source") {
                     SettingsGroup(header="Transfer from",footer="Your original playlists stay unchanged.") {
                         val providers=ui.providers
@@ -150,9 +164,18 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
                     }
                 }
                 step==TransferStepPage.PLAYLISTS -> playlistsPage(ui,coordinator,source)
-                else -> destinationPage(ui,coordinator,source,destination,onPickExisting={destinationPicker=true})
+                else -> destinationPage(ui,coordinator,source,destination,onPickExisting={page=TransferSubPage.AddTo},onCheck={page=TransferSubPage.Check})
             }
             val action: Pair<String,(()->Unit)?>? = when {
+                page==TransferSubPage.AddTo || page==TransferSubPage.Check -> "Done" to {page=null}
+                resultItem!=null -> when {
+                    resultItem.close.isEmpty() -> "Done" to {page=null}
+                    ui.busy -> ui.progress.ifBlank{"Adding…"} to null
+                    closePicks.isEmpty() -> "Pick songs to add" to null
+                    else -> "Add ${closePicks.size} ${if(closePicks.size==1)"song" else "songs"}" to {coordinator.addCloseMatches(resultItem.playlist.playlistId,closePicks)}
+                }
+                record!=null -> "Mark reviewed" to {coordinator.markRecordReviewed(record.id);page=null}
+                page!=null -> null
                 profilesOpen -> null
                 reviewing -> (if(ui.busy)ui.progress.ifBlank{"Working…"} else "Save reviewed changes") to coordinator::apply.takeIf{!ui.busy}
                 running -> if(ui.busy) null else "Done" to {coordinator.close();onDismiss()}
@@ -169,8 +192,8 @@ internal fun PlaylistSyncScreen(coordinator: PlaylistTransferCoordinator,legacy:
             action?.let { (label,onClick) -> item(key="transfer-action") {
                 TransferAction(label=label,enabled=onClick!=null,onClick={onClick?.invoke()},modifier=Modifier.padding(horizontal=16.dp).padding(top=24.dp))
             } }
-            if(running && !ui.busy) item(key="transfer-more") {
-                TextButton(onClick={step=TransferStepPage.SOURCE;coordinator.open()},Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=4.dp)) {Text("Transfer more playlists",color=transferAccent)}
+            if(running && !ui.busy && page==null) item(key="transfer-more") {
+                TextButton(onClick={step=TransferStepPage.SOURCE;page=null;coordinator.open()},Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=4.dp)) {Text("Transfer more playlists",color=transferAccent)}
             }
         }
         val topFadeAlpha by remember(list) { derivedStateOf {
@@ -244,12 +267,11 @@ private fun LazyListScope.playlistsPage(ui: PlaylistTransferUi,coordinator: Play
 }
 
 private fun LazyListScope.destinationPage(ui: PlaylistTransferUi,coordinator: PlaylistTransferCoordinator,source: TransferProvider?,
-    destination: TransferProvider?,onPickExisting: ()->Unit) {
+    destination: TransferProvider?,onPickExisting: ()->Unit,onCheck: ()->Unit) {
     item(key="destination") {
         val count=ui.selectedSources.size
         val names=ui.sourcePlaylists.filter{it.playlistId in ui.selectedSources}.map{it.title}
-        Text("${source?.name ?: ""} · ${if(count==1) names.firstOrNull().orEmpty() else "$count playlists"}",
-            Modifier.padding(horizontal=20.dp).padding(top=10.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+        TransferRoute(source,destination,if(count==1) names.firstOrNull().orEmpty() else "$count playlists")
         val targets=ui.providers.filter{it.writable && it.id!=ui.sourceProvider}
         SettingsGroup(header="Music service",footer=if(targets.isEmpty())"Install a plugin or connect YouTube Music to transfer playlists." else null,topSpacing=14.dp) {
             targets.forEachIndexed { index,provider ->
@@ -279,24 +301,47 @@ private fun LazyListScope.destinationPage(ui: PlaylistTransferUi,coordinator: Pl
                 com.music.streamx.ui.components.SkinSwitch(ui.keepSynchronized,coordinator::keepSynchronized,enabled=!ui.busy,colors=syncSwitchColors())
             }
         }
+        if(destination!=null) SettingsGroup(header="Duplicates",
+            footer=if(ui.skipExisting) "Songs already in the checked playlists are left out and stay where they are. Only new songs are added."
+                else "Turn on to check your ${destination.name} playlists first and add only songs you don't have yet.") {
+            SettingsRow(icon=Icons.Rounded.LibraryAddCheck,title="Skip songs I already have",enabled=!ui.busy,onClick={coordinator.skipExisting(!ui.skipExisting)}) {
+                com.music.streamx.ui.components.SkinSwitch(ui.skipExisting,coordinator::skipExisting,enabled=!ui.busy,colors=syncSwitchColors())
+            }
+            if(ui.skipExisting) {
+                RowDivider()
+                val total=ui.destinationPlaylists.size
+                SettingsRow(icon=Icons.Rounded.PlaylistAddCheck,title="Playlists to check",
+                    value=when { total==0 -> "No playlists yet"; ui.checkPlaylists.isEmpty() -> "All $total"; else -> "${ui.checkPlaylists.size} of $total" },
+                    enabled=!ui.busy && total>0,onClick=onCheck)
+            }
+        }
     }
 }
 
-private fun LazyListScope.progressPage(ui: PlaylistTransferUi,destination: TransferProvider?,onDetail: (String)->Unit) {
+private fun LazyListScope.progressPage(ui: PlaylistTransferUi,source: TransferProvider?,destination: TransferProvider?,onDetail: (String)->Unit) {
     item(key="summary") {
         val c=MaterialTheme.colorScheme
         val finished=ui.batch.count{it.status==BatchStatus.DONE || it.status==BatchStatus.FAILED}
-        val moved=ui.batch.sumOf{it.added+it.alreadyPresent}
-        val total=ui.batch.sumOf{it.total}
+        val added=ui.batch.sumOf{it.added}
+        val had=ui.batch.sumOf{it.alreadyPresent+it.known.size}
         val missing=ui.batch.sumOf{it.notFound.size+it.close.size}
-        Column(Modifier.padding(horizontal=16.dp).padding(top=14.dp)) { TransferCard {
-            Text(if(ui.busy)"$finished of ${ui.batch.size} playlists" else "$moved of $total songs moved",style=MaterialTheme.typography.titleLarge.copy(fontWeight=FontWeight.Bold))
-            LinearProgressIndicator(progress={if(ui.busy) (finished.toFloat()/ui.batch.size.coerceAtLeast(1)) else if(total==0) 1f else moved.toFloat()/total},
+        val checking=ui.busy && ui.batch.all{it.status==BatchStatus.WAITING}
+        TransferRoute(source,destination,null)
+        Column(Modifier.padding(horizontal=16.dp).padding(top=12.dp)) { TransferCard {
+            Text(if(ui.busy)"$finished of ${ui.batch.size} playlists" else "Transfer finished",style=MaterialTheme.typography.titleLarge.copy(fontWeight=FontWeight.Bold))
+            if(checking) LinearProgressIndicator(Modifier.fillMaxWidth().clip(CircleShape),color=transferAccent,trackColor=c.onSurfaceVariant.copy(alpha=.18f))
+            else LinearProgressIndicator(progress={if(ui.busy) finished.toFloat()/ui.batch.size.coerceAtLeast(1) else 1f},
                 Modifier.fillMaxWidth().clip(CircleShape),color=transferAccent,trackColor=c.onSurfaceVariant.copy(alpha=.18f))
+            if(!ui.busy) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                TransferCount(added,"Added",Modifier.weight(1f),Color(0xFF32BE63))
+                TransferCount(had,"Already there",Modifier.weight(1f),c.onSurfaceVariant)
+                TransferCount(missing,"To check",Modifier.weight(1f),Color(0xFFCB8830))
+            }
             Text(when {
+                checking -> ui.progress
                 ui.busy -> "Keep this screen open until it finishes."
-                missing>0 -> "$missing songs weren't found on ${destination?.name ?: "the destination"}. Tap a playlist to see them."
-                else -> "Every song was found on ${destination?.name ?: "the destination"}."
+                missing>0 -> "$missing songs need a look on ${destination?.name ?: "the destination"}. Tap a playlist to see them."
+                else -> "Every song is on ${destination?.name ?: "the destination"}."
             },style=MaterialTheme.typography.bodyMedium,color=c.onSurfaceVariant)
         } }
     }
@@ -309,17 +354,18 @@ private fun LazyListScope.progressPage(ui: PlaylistTransferUi,destination: Trans
                     BatchStatus.WAITING -> "Waiting"
                     BatchStatus.MATCHING -> if(item.total>0)"Matching ${item.done} of ${item.total}" else "Reading songs…"
                     BatchStatus.ADDING -> "Adding songs…"
-                    BatchStatus.DONE -> "${item.added+item.alreadyPresent} of ${item.total} moved"+if(missing>0)" · $missing not found" else ""
+                    BatchStatus.DONE -> listOfNotNull("${item.added} added",(item.alreadyPresent+item.known.size).takeIf{it>0}?.let{"$it already there"},
+                        missing.takeIf{it>0}?.let{"$it to check"}).joinToString(" · ")
                     BatchStatus.FAILED -> item.error ?: "Failed"
                 }
                 SettingsRow(icon=Icons.Rounded.QueueMusic,title=item.playlist.title,subtitle=status,
-                    onClick=if(item.status==BatchStatus.DONE && missing>0 || item.status==BatchStatus.FAILED) ({onDetail(item.playlist.playlistId)}) else null) {
+                    onClick=if(item.status==BatchStatus.DONE || item.status==BatchStatus.FAILED) ({onDetail(item.playlist.playlistId)}) else null) {
                     when(item.status) {
                         BatchStatus.WAITING -> Icon(Icons.Rounded.Schedule,null,Modifier.size(22.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.6f))
                         BatchStatus.MATCHING,BatchStatus.ADDING -> CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp,color=transferAccent)
                         BatchStatus.DONE -> Row(verticalAlignment=Alignment.CenterVertically) {
                             Icon(if(missing>0)Icons.Rounded.Info else Icons.Rounded.CheckCircle,null,Modifier.size(22.dp),tint=if(missing>0)Color(0xFFCB8830) else Color(0xFF32BE63))
-                            if(missing>0) Icon(Icons.Rounded.ChevronRight,null,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.6f))
+                            Icon(Icons.Rounded.ChevronRight,null,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.6f))
                         }
                         BatchStatus.FAILED -> Icon(Icons.Rounded.ErrorOutline,null,Modifier.size(22.dp),tint=MaterialTheme.colorScheme.error)
                     }
@@ -405,63 +451,199 @@ private fun LazyListScope.profilesPage(ui: PlaylistTransferUi,coordinator: Playl
     if(legacy.hasLinks) item {SettingsGroup {SettingsRow(icon=Icons.Rounded.SmartDisplay,title="Earlier YouTube sync profiles",enabled=!ui.busy,onClick=onLegacy)}}
 }
 
-@Composable private fun TransferDestinationDialog(ui: PlaylistTransferUi,onNew: (Boolean)->Unit,onPick: (UserPlaylist)->Unit,onDismiss: ()->Unit) {
-    var query by remember{mutableStateOf("")}
-    AlertDialog(onDismissRequest=onDismiss,title={Text("Add to")},
-        text={Column(Modifier.fillMaxWidth().heightIn(max=440.dp).verticalScroll(rememberScrollState())) {
-            @Composable fun Option(title: String,selected: Boolean,subtitle: String?=null,onClick: ()->Unit) {
-                Row(Modifier.fillMaxWidth().clickable(onClick=onClick).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                    RadioButton(selected,onClick=null)
+/** Where the selected playlists go: new ones, one combined, or an existing playlist. */
+private fun LazyListScope.addToPage(ui: PlaylistTransferUi,coordinator: PlaylistTransferCoordinator,destination: TransferProvider?) {
+    item(key="add-to") {
+        var query by rememberSaveable{mutableStateOf("")}
+        val fresh=ui.destinationPlaylist==null
+        SettingsGroup(header="New",topSpacing=14.dp) {
+            if(ui.selectedSources.size>1) {
+                SettingsRow(icon=Icons.Rounded.CallSplit,title="Separate playlists",subtitle="A new playlist for each one",enabled=!ui.busy,
+                    onClick={coordinator.combine(false)}) {SelectMark(fresh && !ui.combine)}
+                RowDivider()
+                SettingsRow(icon=Icons.Rounded.MergeType,title="One new playlist",subtitle="Combine them into a single playlist",enabled=!ui.busy,
+                    onClick={coordinator.combine(true)}) {SelectMark(fresh && ui.combine)}
+            } else SettingsRow(icon=Icons.Rounded.Add,title="New playlist",enabled=!ui.busy,onClick={coordinator.combine(false)}) {SelectMark(fresh)}
+        }
+        if(ui.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=16.dp).clip(CircleShape),color=transferAccent)
+        val rows=visibleTransferPlaylists(ui.destinationPlaylists,emptySet(),true,query).filter{it.playlistId!=ui.sourcePlaylist}
+        if(ui.destinationPlaylists.size>8) Box(Modifier.padding(start=16.dp,end=16.dp,top=20.dp)) {
+            com.music.streamx.ui.components.SkinOutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),label={Text("Search playlists")},labelText="Search playlists",singleLine=true)
+        }
+        if(rows.isNotEmpty()) SettingsGroup(header="Your ${destination?.name ?: ""} playlists · ${rows.size}",
+            footer="Songs already in the playlist you pick aren't added again.") {
+            rows.forEachIndexed { index,playlist ->
+                if(index>0) RowDivider()
+                SettingsRow(icon=Icons.Rounded.QueueMusic,title=playlist.title,subtitle=playlist.subtitle.ifBlank{null},enabled=!ui.busy,
+                    onClick={coordinator.destination(playlist)}) {SelectMark(playlist.playlistId==ui.destinationPlaylist)}
+            }
+        }
+    }
+}
+
+/** Which destination playlists "Skip songs I already have" looks in. */
+private fun LazyListScope.checkPage(ui: PlaylistTransferUi,coordinator: PlaylistTransferCoordinator,destination: TransferProvider?) {
+    item(key="check") {
+        var query by rememberSaveable{mutableStateOf("")}
+        val ids=ui.destinationPlaylists.map{it.playlistId}.toSet()
+        val all=ui.checkPlaylists.isEmpty()
+        val checked=if(all) ids else ui.checkPlaylists
+        Text("A song found in any of these is left out of the transfer, so it stays where you put it and isn't copied twice.",
+            Modifier.padding(horizontal=20.dp).padding(top=10.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        SettingsGroup(topSpacing=18.dp) {
+            SettingsRow(icon=Icons.Rounded.DoneAll,title="All playlists",subtitle="${ids.size} on ${destination?.name ?: "this service"}",enabled=!ui.busy,
+                onClick={coordinator.checkPlaylists(if(all) emptySet() else ids)}) {SelectMark(all)}
+        }
+        if(ui.destinationPlaylists.size>8) Box(Modifier.padding(start=16.dp,end=16.dp,top=20.dp)) {
+            com.music.streamx.ui.components.SkinOutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),label={Text("Search playlists")},labelText="Search playlists",singleLine=true)
+        }
+        val rows=visibleTransferPlaylists(ui.destinationPlaylists,emptySet(),true,query)
+        if(rows.isNotEmpty()) SettingsGroup(header="Or only these · ${checked.size} checked") {
+            rows.forEachIndexed { index,playlist ->
+                if(index>0) RowDivider()
+                val on=playlist.playlistId in checked
+                SettingsRow(icon=Icons.Rounded.QueueMusic,title=playlist.title,subtitle=playlist.subtitle.ifBlank{null},enabled=!ui.busy,onClick={
+                    val next=if(on) checked-playlist.playlistId else checked+playlist.playlistId
+                    // At least one playlist stays checked; none would mean checking nothing.
+                    if(next.isNotEmpty()) coordinator.checkPlaylists(next)
+                }) {SelectMark(on)}
+            }
+        }
+    }
+}
+
+/** One playlist's outcome: close matches to pick from, songs already there, and songs not found. */
+private fun LazyListScope.resultPage(item: BatchTransfer,destination: TransferProvider?,picks: Map<String,String>,onPick: (String,String?)->Unit) {
+    item(key="result-summary") {
+        val c=MaterialTheme.colorScheme
+        Column(Modifier.padding(horizontal=16.dp).padding(top=14.dp)) { TransferCard {
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                TransferCount(item.added,"Added",Modifier.weight(1f),Color(0xFF32BE63))
+                TransferCount(item.alreadyPresent+item.known.size,"Already there",Modifier.weight(1f),c.onSurfaceVariant)
+                TransferCount(item.close.size+item.notFound.size,"To check",Modifier.weight(1f),Color(0xFFCB8830))
+            }
+            item.error?.let{Text(it,style=MaterialTheme.typography.bodyMedium,color=c.error)}
+            item.warning.takeIf{it.isNotBlank()}?.let{Text(it,style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)}
+        } }
+    }
+    if(item.close.isNotEmpty()) {
+        item(key="close-header") {
+            TransferSection("Close matches · ${item.close.size}","A similar version was found on ${destination?.name ?: "the destination"}, but not an exact one. Pick the right one or skip it.")
+        }
+        items(item.close,key={"close:"+it.source.videoId}) { row ->
+            val c=MaterialTheme.colorScheme
+            val pick=picks[row.source.videoId]
+            Column(Modifier.padding(horizontal=16.dp).padding(top=10.dp)) { TransferCard {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    ServiceTile("playlist",row.source.thumbnailUrl)
                     Column(Modifier.weight(1f).padding(start=12.dp)) {
-                        Text(title,textAlign=TextAlign.Start)
-                        subtitle?.let{Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                        Text(row.source.title,style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.SemiBold),maxLines=2,overflow=TextOverflow.Ellipsis)
+                        Text(listOf(row.source.artist,row.source.durationText.orEmpty()).filter{it.isNotBlank()}.joinToString(" · "),
+                            style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
+                }
+                Column {
+                    row.candidates.forEach { candidate ->
+                        CandidateLine(candidate.title,listOf(candidate.artist,candidate.albumName.orEmpty(),candidate.durationText.orEmpty()).filter{it.isNotBlank()}.joinToString(" · "),
+                            pick==candidate.videoId) {onPick(row.source.videoId,candidate.videoId)}
+                    }
+                    CandidateLine("Skip this song",null,pick==null) {onPick(row.source.videoId,null)}
+                }
+            } }
+        }
+    }
+    if(item.known.isNotEmpty()) {
+        item(key="known-header") {TransferSection("Already in your playlists · ${item.known.size}","Left out so they aren't copied twice.")}
+        items(item.known,key={"known:"+it.first.videoId}) { (song,playlist) -> TransferSongRow(song.title,"${song.artist} · In $playlist",song.thumbnailUrl) }
+    }
+    if(item.notFound.isNotEmpty()) {
+        item(key="missing-header") {TransferSection("Not found · ${item.notFound.size}","Nothing similar turned up on ${destination?.name ?: "the destination"}.")}
+        items(item.notFound,key={"missing:"+it.videoId}) { song -> TransferSongRow(song.title,song.artist,song.thumbnailUrl) }
+    }
+}
+
+/** A saved record of picked matches, with the alternatives that were passed over. */
+private fun LazyListScope.recordPage(record: TransferRecord) {
+    item(key="record-header") {
+        Text("${record.route} · ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.createdAt))}",
+            Modifier.padding(horizontal=20.dp).padding(top=10.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Reviewing this record doesn't change the destination playlist.",
+            Modifier.padding(horizontal=20.dp).padding(top=4.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    itemsIndexed(record.rows,key={index,row->"$index:${row.source.videoId}"}) { _,row ->
+        val c=MaterialTheme.colorScheme
+        val selected=row.candidates.firstOrNull{it.videoId==row.selectedId}
+        Column(Modifier.padding(horizontal=16.dp).padding(top=10.dp)) { TransferCard {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                ServiceTile("playlist",row.source.thumbnailUrl)
+                Column(Modifier.weight(1f).padding(start=12.dp)) {
+                    Text(row.source.title,style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.SemiBold),maxLines=2,overflow=TextOverflow.Ellipsis)
+                    Text(row.source.artist,style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+                }
+                if(row.uncertain && selected!=null && !row.excluded) Icon(Icons.Rounded.Info,"Needs review",Modifier.size(20.dp),tint=Color(0xFFCB8830))
+            }
+            Text(when {
+                row.excluded -> "Skipped"
+                selected==null -> "No selection"
+                else -> "Added: ${selected.title} · ${selected.artist}${selected.durationText?.let{" · $it"}.orEmpty()}"
+            },style=MaterialTheme.typography.bodyMedium)
+            row.candidates.filter{it.videoId!=row.selectedId}.takeIf{it.isNotEmpty()}?.let { others ->
+                Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                    Text("Other versions",style=MaterialTheme.typography.labelMedium,color=c.onSurfaceVariant)
+                    others.forEach{Text("${it.title} · ${it.artist}${it.durationText?.let{d->" · $d"}.orEmpty()}",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)}
+                }
+            }
+        } }
+    }
+}
+
+@Composable private fun TransferSection(title: String,detail: String) {
+    Column(Modifier.padding(horizontal=20.dp).padding(top=26.dp,bottom=2.dp)) {
+        Text(title,style=MaterialTheme.typography.titleMedium.copy(fontWeight=FontWeight.Bold))
+        Text(detail,Modifier.padding(top=2.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable private fun CandidateLine(title: String,subtitle: String?,selected: Boolean,onClick: ()->Unit) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick=onClick).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
+        SelectMark(selected)
+        Column(Modifier.weight(1f).padding(start=12.dp)) {
+            Text(title,style=MaterialTheme.typography.bodyMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
+            subtitle?.let{Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)}
+        }
+    }
+}
+
+@Composable private fun TransferSongRow(title: String,subtitle: String,artwork: String?) {
+    Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
+        ServiceTile("playlist",artwork)
+        Column(Modifier.weight(1f).padding(start=12.dp)) {
+            Text(title,style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(subtitle,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** From → To, with each service's mark, and what is being moved. */
+@Composable private fun TransferRoute(from: TransferProvider?,to: TransferProvider?,what: String?) {
+    val c=MaterialTheme.colorScheme
+    Column(Modifier.padding(horizontal=16.dp).padding(top=14.dp)) { TransferCard {
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            @Composable fun End(label: String,provider: TransferProvider?,modifier: Modifier) {
+                Row(modifier,verticalAlignment=Alignment.CenterVertically) {
+                    ServiceTile(provider?.name ?: "")
+                    Column(Modifier.padding(start=10.dp)) {
+                        Text(label,style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
+                        Text(provider?.name ?: "Choose",style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.SemiBold),maxLines=1,overflow=TextOverflow.Ellipsis)
                     }
                 }
             }
-            val fresh=ui.destinationPlaylist==null
-            if(ui.selectedSources.size>1) {
-                Option("Separate playlists",fresh && !ui.combine,"A new playlist for each one") {onNew(false)}
-                Option("One new playlist",fresh && ui.combine,"Combine them into a single playlist") {onNew(true)}
-            } else Option("New playlist",fresh) {onNew(false)}
-            if(ui.destinationPlaylists.isNotEmpty()) Text("Existing playlists",Modifier.padding(top=12.dp,bottom=4.dp),
-                style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            if(ui.destinationPlaylists.size>8) com.music.streamx.ui.components.SkinOutlinedTextField(query,{query=it},Modifier.fillMaxWidth().padding(vertical=8.dp),
-                label={Text("Search playlists")},labelText="Search playlists",singleLine=true)
-            if(ui.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical=8.dp))
-            visibleTransferPlaylists(ui.destinationPlaylists,emptySet(),true,query).filter{it.playlistId!=ui.sourcePlaylist}.forEach { playlist ->
-                Option(playlist.title,playlist.playlistId==ui.destinationPlaylist) {onPick(playlist)}
-            }
-        }},confirmButton={TextButton(onClick=onDismiss){Text("Done")}})
-}
-
-@Composable private fun TransferResultDialog(item: BatchTransfer,busy: Boolean,onAddClose: ()->Unit,onDismiss: ()->Unit) {
-    val c=MaterialTheme.colorScheme
-    AlertDialog(onDismissRequest=onDismiss,title={Text(item.playlist.title)},text={
-        LazyColumn(Modifier.heightIn(max=460.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            item.error?.let { error -> item {Text(error,color=c.error)} }
-            if(item.status==BatchStatus.DONE) item {Text("${item.added} added · ${item.alreadyPresent} already there",style=MaterialTheme.typography.bodyMedium)}
-            item.warning.takeIf{it.isNotBlank()}?.let { warning -> item {Text(warning,style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)} }
-            if(item.close.isNotEmpty()) {
-                item {Text("Close matches · ${item.close.size}",style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.Bold),modifier=Modifier.padding(top=6.dp))}
-                item {Text("A similar version was found, but not an exact one.",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)}
-                items(item.close) { row -> TransferSongLine(row.source.title,"${row.source.artist}  →  ${row.candidates.first().title} · ${row.candidates.first().artist}") }
-            }
-            if(item.notFound.isNotEmpty()) {
-                item {Text("Not found · ${item.notFound.size}",style=MaterialTheme.typography.titleSmall.copy(fontWeight=FontWeight.Bold),modifier=Modifier.padding(top=6.dp))}
-                items(item.notFound) { song -> TransferSongLine(song.title,song.artist) }
-            }
+            End("From",from,Modifier.weight(1f))
+            Icon(Icons.AutoMirrored.Rounded.ArrowForward,null,Modifier.padding(horizontal=8.dp).size(20.dp),tint=c.onSurfaceVariant)
+            End("To",to,Modifier.weight(1f))
         }
-    },confirmButton={
-        if(item.close.isNotEmpty()) TextButton(onClick=onAddClose,enabled=!busy){Text(if(busy)"Adding…" else "Add ${item.close.size} close matches")}
-        else TextButton(onClick=onDismiss){Text("Close")}
-    },dismissButton=if(item.close.isNotEmpty()) ({TextButton(onClick=onDismiss){Text("Close")}}) else null)
-}
-
-@Composable private fun TransferSongLine(title: String,subtitle: String) {
-    Column {
-        Text(title,style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
-        Text(subtitle,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
-    }
+        what?.takeIf{it.isNotBlank()}?.let{Text(it,style=MaterialTheme.typography.bodyMedium,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)}
+    } }
 }
 
 private val transferAccent: Color @Composable get()=MaterialTheme.colorScheme.primary
@@ -476,10 +658,14 @@ private val transferAccent: Color @Composable get()=MaterialTheme.colorScheme.pr
     val youtube=service.contains("youtube",true)
     val apple=service.contains("apple",true)
     val c=MaterialTheme.colorScheme
-    val color=when {youtube->Color(0xFFFF172A);apple->Color(0xFFFA2D48);else->c.surfaceContainerHighest}
-    val icon=when {youtube->Icons.Rounded.PlayArrow;apple->Icons.Rounded.MusicNote;service=="sync"->Icons.Rounded.Sync;service=="playlist"->Icons.Rounded.QueueMusic;else->Icons.Rounded.LibraryMusic}
+    val spotify=service.contains("spotify",true)
+    val color=when {youtube->Color(0xFFFF172A);apple->Color(0xFFFA2D48);spotify->Color(0xFF1ED760)
+        service.contains("deezer",true)->Color(0xFFA238FF);service.contains("tidal",true)->Color.Black
+        service.contains("amazon",true)->Color(0xFF25D1DA);else->c.surfaceContainerHighest}
+    val branded=color!=c.surfaceContainerHighest
+    val icon=when {youtube->Icons.Rounded.PlayArrow;branded->Icons.Rounded.MusicNote;service.contains("local",true)->Icons.Rounded.PhoneAndroid;service.contains("cloud",true)->Icons.Rounded.Cloud;service=="sync"->Icons.Rounded.Sync;service=="playlist"->Icons.Rounded.QueueMusic;else->Icons.Rounded.LibraryMusic}
     Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(color),contentAlignment=Alignment.Center) {
-        Icon(icon,null,Modifier.size(24.dp),tint=if(youtube || apple)Color.White else c.onSurfaceVariant)
+        Icon(icon,null,Modifier.size(24.dp),tint=if(spotify)Color.Black else if(branded)Color.White else c.onSurfaceVariant)
         if(!artwork.isNullOrBlank())AsyncImage(artwork,null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
     }
 }
@@ -518,21 +704,4 @@ private val transferAccent: Color @Composable get()=MaterialTheme.colorScheme.pr
             com.music.streamx.ui.components.SkinSwitch(checked,onChange,enabled=enabled,colors=syncSwitchColors())
         }
     }
-}
-
-@Composable private fun TransferRecordDialog(record: TransferRecord,onDismiss: ()->Unit,onReviewed: ()->Unit) {
-    AlertDialog(onDismissRequest=onDismiss,title={Text(record.title)},text={
-        LazyColumn(Modifier.heightIn(max=440.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-            item {Text("${record.route} · ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.createdAt))}",style=MaterialTheme.typography.bodySmall)}
-            item {Text("This is the saved transfer record. Reviewing it does not change the destination playlist.",style=MaterialTheme.typography.bodySmall)}
-            itemsIndexed(record.rows) {_,row -> Column {
-                Text("${row.source.title} · ${row.source.artist}",style=MaterialTheme.typography.titleSmall)
-                val selected=row.candidates.firstOrNull{it.videoId==row.selectedId}
-                Text(if(row.excluded)"Skipped" else if(selected==null)"No selection" else "${if(row.uncertain)"Brute · " else "Selected · "}${selected.title} · ${selected.artist} · ${selected.durationText.orEmpty()}",style=MaterialTheme.typography.bodySmall)
-                row.candidates.filter{it.videoId!=row.selectedId}.forEach {candidate ->
-                    Text("Alternate: ${candidate.title} · ${candidate.artist} · ${candidate.durationText.orEmpty()}",Modifier.padding(top=4.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }}
-        }
-    },confirmButton={TextButton(onClick=onReviewed){Text("Mark reviewed")}},dismissButton={TextButton(onClick=onDismiss){Text("Close")}})
 }

@@ -33,6 +33,8 @@ internal data class PlaylistTransferPlan(
     val destinationPlaylist: String?,
     val title: String,
     val rows: List<SyncMatch>,
+    /** Source songs left out because the listener already has them, with the playlist each is in. */
+    val known: List<Pair<com.music.streamx.data.model.Song,String>> = emptyList(),
 )
 internal data class PlaylistTransferResult(val playlistId: String,val added: Int,val alreadyPresent: Int,val warning: String)
 
@@ -42,7 +44,7 @@ internal suspend fun guardTransferAccounts(source: PlaylistTransferBackend,desti
 }
 
 internal suspend fun preparePlaylistTransfer(source: PlaylistTransferBackend,destination: PlaylistTransferBackend,
-    sourcePlaylist: String,destinationPlaylist: String?,title: String,handled: Set<String> = emptySet(),allowEmpty: Boolean = false,progress: (Int,Int)->Unit): PlaylistTransferPlan = coroutineScope {
+    sourcePlaylist: String,destinationPlaylist: String?,title: String,handled: Set<String> = emptySet(),allowEmpty: Boolean = false,existing: ExistingTracks? = null,progress: (Int,Int)->Unit): PlaylistTransferPlan = coroutineScope {
     check(destination.writable) { "This provider cannot receive playlists" }
     check(source.id!=destination.id || sourcePlaylist!=destinationPlaylist) { "Choose a different destination playlist" }
     val sourceOwner=source.identity();val destinationOwner=destination.identity()
@@ -50,7 +52,11 @@ internal suspend fun preparePlaylistTransfer(source: PlaylistTransferBackend,des
     destinationPlaylist?.let { id -> check(destination.playlists(true).any{it.playlistId==id}) { "Choose an editable destination playlist" } }
     val allSongs=source.tracks(sourcePlaylist)
     check(allSongs.isNotEmpty() || allowEmpty) { "The source playlist is empty" }
-    val songs=allSongs.filterNot{it.videoId in handled}
+    val pending=allSongs.filterNot{it.videoId in handled}
+    // Songs the listener already has are not searched for at all.
+    val known=pending.mapNotNull{song->existing?.find(song)?.let{song to it}}
+    val knownIds=known.mapTo(HashSet()){it.first.videoId}
+    val songs=pending.filterNot{it.videoId in knownIds}
     guardTransferAccounts(source,destination,sourceOwner,destinationOwner)
     val permits=Semaphore(3);val done=AtomicInteger()
     val matches=songs.map { song -> async {
@@ -66,7 +72,11 @@ internal suspend fun preparePlaylistTransfer(source: PlaylistTransferBackend,des
         }
     }}.awaitAll()
     guardTransferAccounts(source,destination,sourceOwner,destinationOwner)
-    PlaylistTransferPlan(sourcePlaylist,sourceOwner,destinationOwner,destinationPlaylist,title,matches)
+    // A match can also turn out to be a track they have under another name.
+    val matchedKnown=matches.mapNotNull{row->row.selectedId?.let{existing?.findId(it)}?.let{row.source to it}}
+    val skip=matchedKnown.mapTo(HashSet()){it.first.videoId}
+    PlaylistTransferPlan(sourcePlaylist,sourceOwner,destinationOwner,destinationPlaylist,title,
+        matches.filterNot{it.source.videoId in skip},known+matchedKnown)
 }
 
 /** Add-only, deduplicated transfer. Never retry an ambiguous provider mutation automatically. */

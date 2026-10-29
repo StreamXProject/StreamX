@@ -30,6 +30,10 @@ internal data class PlaylistTransferUi(
     val trackCounts: Map<String,Int> = emptyMap(),
     /** Several source playlists go into one new playlist named [title] rather than one each. */
     val combine: Boolean = false,
+    /** Leave out songs already in the listener's destination playlists. */
+    val skipExisting: Boolean = false,
+    /** Destination playlists checked for [skipExisting]; empty means all of them. */
+    val checkPlaylists: Set<String> = emptySet(),
 )
 internal enum class BatchStatus { WAITING, MATCHING, ADDING, DONE, FAILED }
 /** One playlist of a multi-playlist transfer, as the progress screen lists it. */
@@ -37,6 +41,8 @@ internal data class BatchTransfer(
     val playlist: UserPlaylist,val status: BatchStatus = BatchStatus.WAITING,val done: Int = 0,val total: Int = 0,
     val added: Int = 0,val alreadyPresent: Int = 0,val notFound: List<com.music.streamx.data.model.Song> = emptyList(),
     val close: List<SyncMatch> = emptyList(),val error: String? = null,val warning: String = "",
+    /** Songs left out because they are already in one of the checked playlists, with that playlist's name. */
+    val known: List<Pair<com.music.streamx.data.model.Song,String>> = emptyList(),
 )
 internal class PlaylistTransferCoordinator(context: Context,private val scope: CoroutineScope,private val youtubeIdentity: ()->String?,private val onChanged: ()->Unit) {
     private val preferences=context.getSharedPreferences("streamx_playlist_transfer",Context.MODE_PRIVATE)
@@ -169,7 +175,7 @@ internal class PlaylistTransferCoordinator(context: Context,private val scope: C
         automatic?.cancel()
         plan=null
         reviewingLink=null
-        _state.value=PlaylistTransferUi(links=links,records=records,brute=preferences.getBoolean("brute",false),sourceUserOnly=preferences.getBoolean("user_playlists",true),busy=true,progress="Finding playlist providers…")
+        _state.value=PlaylistTransferUi(links=links,records=records,brute=preferences.getBoolean("brute",false),skipExisting=preferences.getBoolean("skip_existing",false),sourceUserOnly=preferences.getBoolean("user_playlists",true),busy=true,progress="Finding playlist providers…")
         work {
             ApkExtensions.refresh()
             backends=installedBackends()
@@ -265,8 +271,39 @@ internal class PlaylistTransferCoordinator(context: Context,private val scope: C
             check(backend.identity()==owner) { "Destination account changed. Refresh playlists." }
             destinationVisibilityKey=transferVisibilityKey(backend.id,owner)
             val hidden=preferences.getStringSet(destinationVisibilityKey,emptySet()).orEmpty().toSet()
-            _state.value=_state.value.copy(destinationPlaylists=rows,hiddenDestinationPlaylists=hidden)
+            val checked=preferences.getStringSet(checkKey(id),emptySet()).orEmpty().filterTo(HashSet()){c->rows.any{it.playlistId==c}}
+            _state.value=_state.value.copy(destinationPlaylists=rows,hiddenDestinationPlaylists=hidden,checkPlaylists=checked)
         }
+    }
+    private fun checkKey(provider: String)="check_playlists:$provider"
+    fun skipExisting(value: Boolean) {
+        if(_state.value.busy) return
+        preferences.edit().putBoolean("skip_existing",value).apply()
+        _state.value=_state.value.copy(skipExisting=value)
+    }
+    /** Which destination playlists to check for songs already there; empty is all. */
+    fun checkPlaylists(ids: Set<String>) {
+        val ui=_state.value
+        if(ui.busy) return
+        val all=ui.destinationPlaylists.map{it.playlistId}.toSet()
+        val chosen=if(ids.containsAll(all)) emptySet() else ids
+        ui.destinationProvider?.let{preferences.edit().putStringSet(checkKey(it),chosen).apply()}
+        _state.value=ui.copy(checkPlaylists=chosen)
+    }
+    /** Reads every checked destination playlist, a few at a time. */
+    private suspend fun existingTracks(destination: PlaylistTransferBackend,ui: PlaylistTransferUi): ExistingTracks = coroutineScope {
+        val playlists=ui.destinationPlaylists.filter{ui.checkPlaylists.isEmpty() || it.playlistId in ui.checkPlaylists}
+        val permits=kotlinx.coroutines.sync.Semaphore(3)
+        val read=java.util.concurrent.atomic.AtomicInteger()
+        _state.value=_state.value.copy(progress="Checking ${playlists.size} ${destination.name} playlists…")
+        ExistingTracks.of(playlists.map{playlist->async{
+            permits.withPermit{
+                val songs=destination.tracks(playlist.playlistId)
+                val n=read.incrementAndGet()
+                _state.value=_state.value.copy(progress="Checking your playlists · $n of ${playlists.size}")
+                playlist.title to songs
+            }
+        }}.awaitAll())
     }
     fun destination(playlist: UserPlaylist?) {
         if(_state.value.busy || playlist!=null && playlist !in _state.value.destinationPlaylists) return
@@ -387,20 +424,22 @@ internal class PlaylistTransferCoordinator(context: Context,private val scope: C
         batchPlans.clear()
         _state.value=ui.copy(batch=playlists.map{BatchTransfer(it)},stage=SyncStage.COMPLETE,progress="Transferring to ${destination.name}…")
         work {
+            val existing=if(ui.skipExisting) existingTracks(destination,ui) else null
+            _state.value=_state.value.copy(progress="Transferring to ${destination.name}…")
             for(playlist in playlists) {
                 val id=playlist.playlistId
                 try {
                     updateBatch(id){it.copy(status=BatchStatus.MATCHING)}
                     val title=sharedTitle ?: playlist.title
                     // Songs already taken from an earlier source playlist are skipped, so the combined order is the sources' order.
-                    val prepared=preparePlaylistTransfer(source,destination,id,ui.destinationPlaylist,title,handled=if(combined)seen.toSet() else emptySet(),allowEmpty=combined) {done,total->updateBatch(id){it.copy(done=done,total=total)}}
+                    val prepared=preparePlaylistTransfer(source,destination,id,ui.destinationPlaylist,title,handled=if(combined)seen.toSet() else emptySet(),allowEmpty=combined,existing=existing) {done,total->updateBatch(id){it.copy(done=done,total=total)}}
                         .copy(destinationPlaylist=shared)
-                    if(combined) seen+=prepared.rows.map{it.source.videoId}
+                    if(combined) seen+=prepared.rows.map{it.source.videoId}+prepared.known.map{it.first.videoId}
                     val rows=prepared.rows
                     val confident=rows.filter{it.selectedId!=null && !it.excluded}
-                    updateBatch(id){it.copy(status=BatchStatus.ADDING,total=rows.size,done=0,
-                        notFound=rows.filter{row->row.selectedId==null && row.candidates.isEmpty()}.map{row->row.source},
-                        close=rows.filter{row->row.selectedId==null && row.candidates.isNotEmpty()})}
+                    updateBatch(id){it.copy(status=BatchStatus.ADDING,total=rows.size+prepared.known.size,done=0,known=prepared.known,
+                        notFound=rows.filter{row->!row.excluded && row.selectedId==null && row.candidates.isEmpty()}.map{row->row.source},
+                        close=rows.filter{row->!row.excluded && row.selectedId==null && row.candidates.isNotEmpty()})}
                     var plan=prepared
                     val result=if(confident.isEmpty()) null else mutationLock.withLock {
                         applyPlaylistTransfer(source,destination,prepared,onCreated={created->plan=prepared.copy(destinationPlaylist=created)},
@@ -422,15 +461,20 @@ internal class PlaylistTransferCoordinator(context: Context,private val scope: C
             }
         }
     }
-    /** Adds the top candidate for each close match of one finished playlist, as Brute would, and keeps a record for review. */
-    fun addCloseMatches(id: String) {
+    /**
+     * Adds the close matches of one finished playlist: [picks] maps a source
+     * song to the candidate chosen for it; songs left out are skipped. The
+     * choices are kept as a transfer record for later review.
+     */
+    fun addCloseMatches(id: String,picks: Map<String,String>) {
         val ui=_state.value
         val item=ui.batch.firstOrNull{it.playlist.playlistId==id} ?: return
         val plan=batchPlans[id] ?: return
         val source=backends[ui.sourceProvider] ?: return
         val destination=backends[ui.destinationProvider] ?: return
-        if(ui.busy || item.close.isEmpty()) return
-        val rows=brutePlaylistMatches(item.close,true)
+        if(ui.busy || item.close.isEmpty() || picks.isEmpty()) return
+        val rows=item.close.map{row->picks[row.source.videoId]?.takeIf{p->row.candidates.any{it.videoId==p}}
+            ?.let{row.copy(selectedId=it,uncertain=true)} ?: row.copy(excluded=true)}
         work {
             _state.value=_state.value.copy(progress="Adding close matches…")
             val result=mutationLock.withLock {

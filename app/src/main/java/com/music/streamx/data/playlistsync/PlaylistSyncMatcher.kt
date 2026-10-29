@@ -44,3 +44,33 @@ internal fun brutePlaylistMatches(rows: List<SyncMatch>, enabled: Boolean): List
         else -> row
     }
 }
+
+/**
+ * Songs already in the listener's destination playlists, by track id and by a
+ * loose title-and-artist key, so a different release of a song they already
+ * have still counts as had. Values name the playlist it was found in.
+ */
+internal class ExistingTracks(private val ids: Map<String,String>,private val keys: Map<String,String>) {
+    val size: Int get()=ids.size
+    /** Where [song] (a source track) already is, if anywhere. */
+    fun find(song: Song): String? = ids[song.videoId] ?: songKeys(song).firstNotNullOfOrNull { keys[it] }
+    /** Where the destination track [id] is, if anywhere. */
+    fun findId(id: String): String? = ids[id]
+    companion object {
+        fun of(playlists: List<Pair<String,List<Song>>>): ExistingTracks {
+            val ids=HashMap<String,String>();val keys=HashMap<String,String>()
+            for((title,songs) in playlists) for(song in songs) {
+                ids.putIfAbsent(song.videoId,title)
+                songKeys(song).forEach{keys.putIfAbsent(it,title)}
+            }
+            return ExistingTracks(ids,keys)
+        }
+    }
+}
+
+/** Title (without featured-artist credits) with each credited artist. */
+private fun songKeys(song: Song): List<String> {
+    val title=normalized(song.title.replace(Regex("(?i)\\s*[(\\[](?:feat|ft|with)\\.?\\s[^)\\]]*[)\\]]"),""))
+    if(title.isBlank()) return emptyList()
+    return credits(song.artist).map{"$title|$it"}
+}

@@ -44,6 +44,8 @@ internal class PluginTransferBackend(private val config: SourceConfig): Playlist
         if(capabilities==null) {
             val response=JSONObject(ApkExtensions.call(config,"health",Bundle()))
             check(!response.has("error")) {response.optString("error")}
+            // A plugin that isn't ready (signed out, say) says why instead of listing what it can do.
+            check(response.has("capabilities") || response.optBoolean("ok",true)) {response.optString("message").ifBlank{"Sign in to $name first"}}
             val array=response.optJSONArray("capabilities") ?: error("$name does not advertise playlist support")
             val supported=(0 until array.length()).map{array.optString(it)}.toSet()
             check("detail" in supported && "account" in supported) {"$name does not support playlist transfers"}
