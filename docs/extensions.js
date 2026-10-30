@@ -70,7 +70,7 @@ window.streamxLogo = logo;
     const reveal = el => window.streamxReveal ? window.streamxReveal(el) : el.classList.add('in');
     const pluginCards = plugins.map((item, i) => {
       const article = document.createElement('article');
-      article.className = 'public-plugin reveal spot';
+      article.className = 'public-plugin reveal';
       article.style.setProperty('--d', `${i * .08}s`);
       const top = document.createElement('div'); top.className = 'plugin-top';
       const text = document.createElement('div');
@@ -89,7 +89,7 @@ window.streamxLogo = logo;
     });
     const skinCards = skins.map((item, i) => {
       const a = document.createElement('a');
-      a.className = 'skin-card reveal spot'; a.href = item.variants[0].apkUrl; a.id = `skin-${item.id}`;
+      a.className = 'skin-card reveal'; a.href = item.variants[0].apkUrl; a.id = `skin-${item.id}`;
       a.style.setProperty('--d', `${Math.min(i, 12) * .03}s`);
       const text = document.createElement('div');
       const name = document.createElement('b'); name.textContent = item.name;

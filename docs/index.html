@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#12100d" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#fffbea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0c0c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ebeae5" media="(prefers-color-scheme: light)">
 <meta name="description" content="StreamX is a music player for Android. Download the APK, plugins, skins and the optional Automix engine.">
 <title>StreamX — music player for Android</title>
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="alternate icon" href="assets/icon.webp">
@@ -13,7 +13,6 @@
 <script src="extensions.js" defer></script><script src="motion.js" defer></script><script src="tour.js" defer></script><script src="app.js" defer></script>
 </head>
 <body>
-<div class="backdrop" aria-hidden="true"><div class="blob blob-a"></div><div class="blob blob-b"></div><div class="blob blob-c"></div></div>
 <div class="progress" aria-hidden="true"></div>
 
 <header class="nav" id="nav">
@@ -26,7 +25,7 @@
       <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>
       <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg>
     </button>
-    <a class="nav-cta magnetic" href="https://github.com/StreamXProject/StreamX/releases/latest/download/StreamX-arm64-v8a.apk">Download</a>
+    <a class="nav-cta" href="https://github.com/StreamXProject/StreamX/releases/latest/download/StreamX-arm64-v8a.apk">Download</a>
   </div>
 </header>
 
@@ -39,15 +38,13 @@
     </h1>
     <p class="lead reveal" style="--d:.35s">A music player for Android that plays from YouTube Music, JioSaavn, your own servers and plugins, trying each source in the order you choose.</p>
     <div class="download reveal" style="--d:.45s">
-      <a class="button magnetic" id="download" href="https://github.com/StreamXProject/StreamX/releases/latest/download/StreamX-arm64-v8a.apk"><span class="button-label">Download APK</span><span class="button-icon" aria-hidden="true">↓</span></a>
+      <a class="button" id="download" href="https://github.com/StreamXProject/StreamX/releases/latest/download/StreamX-arm64-v8a.apk"><span class="button-label">Download APK</span><span class="button-icon" aria-hidden="true">↓</span></a>
       <a class="quiet link-arrow" id="release-notes" href="https://github.com/StreamXProject/StreamX/releases">Release notes <span aria-hidden="true">↗</span></a>
     </div>
   </div>
 
   <div class="hero-visual reveal" style="--d:.2s" aria-hidden="true">
-    <div class="halo"></div>
-    <div class="ring ring-a"></div><div class="ring ring-b"></div>
-    <div class="tilt" data-tilt>
+    <div class="tilt">
       <div class="phone phone-hero">
         <div class="screen"><img src="assets/screens/home.webp" alt="" data-shot="Home" decoding="async"></div>
       </div>
@@ -59,14 +56,14 @@
 
 <div class="marquee" aria-hidden="true">
   <div class="marquee-track" id="marquee">
-    <span>Spotify</span><i>✦</i><span>Apple Music</span><i>✦</i><span>Amazon Music</span><i>✦</i><span>CloudStream</span><i>✦</i><span>Skins</span><i>✦</i><span>Automix</span><i>✦</i>
-    <span>Spotify</span><i>✦</i><span>Apple Music</span><i>✦</i><span>Amazon Music</span><i>✦</i><span>CloudStream</span><i>✦</i><span>Skins</span><i>✦</i><span>Automix</span><i>✦</i>
+    <span>Spotify</span><i>/</i><span>Apple Music</span><i>/</i><span>Amazon Music</span><i>/</i><span>CloudStream</span><i>/</i><span>Skins</span><i>/</i><span>Automix</span><i>/</i>
+    <span>Spotify</span><i>/</i><span>Apple Music</span><i>/</i><span>Amazon Music</span><i>/</i><span>CloudStream</span><i>/</i><span>Skins</span><i>/</i><span>Automix</span><i>/</i>
   </div>
 </div>
 
 <section class="wrap screens" id="screens" aria-labelledby="screens-heading">
   <div class="section-head reveal">
-    <div class="eyebrow"><span class="dot"></span> SKINS</div>
+    <div class="eyebrow"><b>01</b> Skins</div>
     <h2 id="screens-heading">One app, many looks.</h2>
     <p>Pick a skin to see its home, player and library.</p>
   </div>
@@ -89,7 +86,7 @@
       </div>
       <div class="skin-picker" id="skin-picker" role="group" aria-label="Skin"></div>
       <div class="tour-foot">
-        <a class="button button-sm magnetic" id="skin-get" href="#plugins" hidden><span class="button-label">Get this skin</span><span class="button-icon" aria-hidden="true">↓</span></a>
+        <a class="button button-sm" id="skin-get" href="#plugins" hidden><span class="button-label">Get this skin</span><span class="button-icon" aria-hidden="true">↓</span></a>
         <button class="autoplay" id="autoplay" type="button" aria-pressed="true"><span class="ring-timer"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16"/></svg></span><span class="autoplay-label">Pause</span></button>
       </div>
     </div>
@@ -98,13 +95,13 @@
 
 <section class="wrap extensions" id="plugins" aria-labelledby="plugins-heading">
   <div class="section-head reveal">
-    <div class="eyebrow"><span class="dot"></span> EXTENSIONS</div>
+    <div class="eyebrow"><b>02</b> Extensions</div>
     <h2 id="plugins-heading">Plugins and skins.</h2>
     <p>Add this link in StreamX under Settings → Sources to install and update them in the app, or download the APKs here.</p>
   </div>
   <div class="repository-link reveal">
     <label for="repository-url">REPOSITORY LINK</label>
-    <div class="repo-row"><input id="repository-url" readonly value="https://streamxproject.github.io/StreamX-Releases/extensions/index.json"><button type="button" id="copy-repository" class="magnetic"><span>Copy link</span></button></div>
+    <div class="repo-row"><input id="repository-url" readonly value="https://streamxproject.github.io/StreamX-Releases/extensions/index.json"><button type="button" id="copy-repository"><span>Copy link</span></button></div>
     <span class="fine" id="copy-status" role="status" aria-live="polite"></span>
   </div>
   <h3 class="sub-head reveal">Plugins</h3>
@@ -114,9 +111,9 @@
 </section>
 
 <section class="wrap" id="automix">
-  <div class="automix-panel reveal spot">
+  <div class="automix-panel reveal">
     <div class="automix-copy">
-      <div class="eyebrow"><span class="dot"></span> OPTIONAL</div>
+      <div class="eyebrow"><b>03</b> Automix · optional</div>
       <h2>Automix.</h2>
       <p>An engine and audio analysis models that line up beats and vocals for smoother transitions. Turn on Automix in Settings and StreamX offers the download.</p>
       <a class="quiet link-arrow" id="automix-release" href="https://github.com/StreamXProject/StreamX-Releases/releases/tag/automix-1">Automix packages <span aria-hidden="true">↗</span></a>
@@ -134,7 +131,7 @@
 
 <section class="wrap install">
   <div class="section-head reveal">
-    <div class="eyebrow"><span class="dot"></span> INSTALL</div>
+    <div class="eyebrow"><b>04</b> Install</div>
     <h2>Three steps.</h2>
   </div>
   <ol class="steps">

@@ -2,7 +2,6 @@
 (() => {
   const root = document.documentElement;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   // Screenshot slots. The shimmer placeholder (labelled by data-label) stays visible until an image loads.
   // setShot swaps images with a crossfade and resolves once the new image is showing (or missing).
@@ -72,75 +71,4 @@
       for (const a of links) a.classList.toggle('active', a.getAttribute('href') === `#${entry.target.id}`);
   }, {rootMargin: '-45% 0px -50% 0px'});
   links.forEach(a => { const s = document.querySelector(a.getAttribute('href')); if (s) sections.observe(s); });
-
-  if (reduced || !fine) return;
-
-  // Hero phone tilt.
-  const tilt = document.querySelector('[data-tilt]');
-  const hero = document.querySelector('.hero');
-  hero.addEventListener('pointermove', e => {
-    const r = hero.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
-    tilt.style.transform = `rotateY(${x * 14}deg) rotateX(${-y * 10}deg)`;
-  });
-  hero.addEventListener('pointerleave', () => { tilt.style.transform = ''; });
-
-  // Cursor spotlight on cards.
-  document.addEventListener('pointermove', e => {
-    const card = e.target.closest?.('.spot');
-    if (!card) return;
-    const r = card.getBoundingClientRect();
-    card.style.setProperty('--mx', `${e.clientX - r.left}px`);
-    card.style.setProperty('--my', `${e.clientY - r.top}px`);
-  }, {passive: true});
-
-  // Magnetic buttons. The pull is measured from where the button rests, not
-  // from where it was just moved to — measuring the moved box fed each shift
-  // back into the next and made the button shake — and it is eased once per
-  // frame rather than set on every pointer event.
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    const pulls = new Map();
-    let frame = 0;
-    const step = () => {
-      frame = 0;
-      for (const [el, p] of pulls) {
-        p.x += (p.tx - p.x) * .2;
-        p.y += (p.ty - p.y) * .2;
-        const settled = Math.abs(p.tx - p.x) < .05 && Math.abs(p.ty - p.y) < .05;
-        if (settled && !p.tx && !p.ty) { el.style.transform = ''; pulls.delete(el); continue; }
-        el.style.transform = `translate3d(${p.x.toFixed(2)}px, ${p.y.toFixed(2)}px, 0)`;
-        if (!settled) frame ||= requestAnimationFrame(step);
-      }
-    };
-    const kick = () => { frame ||= requestAnimationFrame(step); };
-    document.addEventListener('pointermove', e => {
-      const el = e.target.closest?.('.magnetic');
-      if (!el) return;
-      let p = pulls.get(el);
-      if (!p) {
-        const r = el.getBoundingClientRect();
-        p = {x: 0, y: 0, tx: 0, ty: 0, cx: r.left + r.width / 2, cy: r.top + r.height / 2};
-        pulls.set(el, p);
-      }
-      if (!p.rest) {
-        // Re-read the resting centre once per hover, with the current pull taken out.
-        const r = el.getBoundingClientRect();
-        p.cx = r.left + r.width / 2 - p.x;
-        p.cy = r.top + r.height / 2 - p.y;
-        p.rest = true;
-      }
-      p.tx = (e.clientX - p.cx) * .12;
-      p.ty = (e.clientY - p.cy) * .18;
-      kick();
-    }, {passive: true});
-    document.addEventListener('pointerout', e => {
-      const el = e.target.closest?.('.magnetic');
-      const p = el && pulls.get(el);
-      if (!p || el.contains(e.relatedTarget)) return;
-      p.tx = 0; p.ty = 0; p.rest = false;
-      kick();
-    });
-    // A scroll moves the resting centre; measure it again on the next move.
-    addEventListener('scroll', () => { for (const p of pulls.values()) p.rest = false; }, {passive: true});
-  }
 })();
